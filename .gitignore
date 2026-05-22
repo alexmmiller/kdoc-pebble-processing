@@ -1,8 +1,12 @@
 # Gradle Build Output
+# Build Output
 .gradle/
 build/
+target/
+out/
+bin/
 
-# Ignore all .jar files...
+# ... Keep the rest of your file exactly as it was ...# Ignore all .jar files...
 *.jar
 # ...EXCEPT the Gradle wrappers
 !gradle/wrapper/gradle-wrapper.jar
