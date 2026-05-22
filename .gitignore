@@ -5,6 +5,7 @@ build/
 target/
 out/
 bin/
+output/
 
 # ... Keep the rest of your file exactly as it was ...# Ignore all .jar files...
 *.jar
