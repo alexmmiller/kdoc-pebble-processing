@@ -1,0 +1,7 @@
+Latest Articles
+	•	{% for article in articles %}
+	•	{{ article.title }} {{ article.content }} {% for section in article %}
+	•	Section {{ section }}
+	•	{% else %}
+	•	No articles found.
+	•	{% endfor %}

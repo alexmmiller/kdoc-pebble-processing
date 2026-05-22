@@ -1,0 +1,26 @@
+# Gradle Build Output
+.gradle/
+build/
+
+# Ignore all .jar files...
+*.jar
+# ...EXCEPT the Gradle wrappers
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# VS Code
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+.metadata/
+
+# OS generated files
+.DS_Store
+Thumbs.db
