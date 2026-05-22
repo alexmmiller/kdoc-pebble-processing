@@ -1,0 +1,39 @@
+<html>
+<head>
+    <title>{{ moduleName }} Quick Reference</title>
+    <style>
+        body { font-family: monospace; max-width: 1000px; margin: 20px auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+        th { background: #333; color: white; }
+        .sig { color: #0066cc; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>⚡ {{ moduleName }} Cheat Sheet</h1>
+    <table>
+        <tr>
+            <th>Class</th>
+            <th>Signature</th>
+            <th>Description</th>
+        </tr>
+        {% for package in packages %}
+            {% for classLine in package.classlines %}
+                {% for fun in classLine.functions %}
+                <tr>
+                    <td>{{ classLine.className }}</td>
+                    <td class="sig">{{ fun.signatures | join('<br>') | raw }}</td>
+                    <td>
+                        {% if fun.doc is not empty %}
+                            {{ fun.doc | first | cleanDoc }} {# Just grabs the first line of the doc #}
+                        {% else %}
+                            <em>No description</em>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+        {% endfor %}
+    </table>
+</body>
+</html>

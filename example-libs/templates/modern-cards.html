@@ -1,0 +1,45 @@
+<html>
+<head>
+    <title>{{ moduleName }} Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; }
+        h1 { text-align: center; color: #1a1a1a; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+        .card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .doc-text { color: #555; font-style: italic; }
+        .func-title { font-weight: bold; color: #e74c3c; margin-top: 15px; }
+        code { background: #f8f9fa; border: 1px solid #e9ecef; padding: 3px; display: block; margin: 5px 0; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>🚀 {{ moduleName }}</h1>
+    
+    {% for package in packages %}
+        <div class="grid">
+        {% for classLine in package.classlines %}
+            <div class="card">
+                <h2>{{ classLine.className }}</h2>
+                
+                {% if classLine.doc is not empty %}
+                    <p class="doc-text">
+                        {% for docItem in classLine.doc %}
+                            {{ docItem | cleanDoc }}<br>
+                        {% endfor %}
+                    </p>
+                {% endif %}
+
+                <hr>
+                
+                {% for fun in classLine.functions %}
+                    <div class="func-title">{{ fun.functionName }}()</div>
+                    {% for signature in fun.signatures %}
+                        <code>{{ signature }}</code>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        {% endfor %}
+        </div>
+    {% endfor %}
+</body>
+</html>

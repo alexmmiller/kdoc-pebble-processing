@@ -1,0 +1,54 @@
+<html>
+<head>
+    <title>{{ moduleName }} - Documentation</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; max-width: 900px; margin: 40px auto; color: #333; }
+        .class-block { border-left: 4px solid #4CAF50; padding-left: 20px; margin-bottom: 40px; }
+        .function-block { background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        code { background: #eee; padding: 2px 5px; border-radius: 3px; color: #d63384; }
+    </style>
+</head>
+<body>
+    <h1>Module: {{ moduleName }}</h1>
+    <hr>
+    
+    {% for package in packages %}
+        <h2>📦 Package: {{ package.packageName }}</h2>
+        
+        {% for classLine in package.classlines %}
+            <div class="class-block">
+                <h3>Class: <code>{{ classLine.className }}</code></h3>
+                
+                {% if classLine.doc is not empty %}
+                    <p>
+                    {% for docItem in classLine.doc %}
+                        {{ docItem | cleanDoc }}<br>
+                    {% endfor %}
+                    </p>
+                {% endif %}
+
+                <h4>Functions:</h4>
+                {% for fun in classLine.functions %}
+                    <div class="function-block">
+                        <strong>{{ fun.functionName }}</strong>
+                        
+                        <ul>
+                        {% for signature in fun.signatures %}
+                            <li><code>{{ signature }}</code></li>
+                        {% endfor %}
+                        </ul>
+
+                        {% if fun.doc is not empty %}
+                            <ul>
+                            {% for docItem in fun.doc %}
+                                <li><em>{{ docItem | cleanDoc }}</em></li>
+                            {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    {% endfor %}
+</body>
+</html>
