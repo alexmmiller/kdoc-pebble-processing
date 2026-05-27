@@ -4,23 +4,196 @@
     <meta charset="UTF-8">
     <title>{{ name }} - Documentation</title>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 2rem; max-width: 1200px; margin: 0 auto; color: #19191c; line-height: 1.6; }
-        a { color: #2762df; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .ContentGroup { margin-bottom: 1.5rem; }
-        .ContentDivergentInstance { background: #f4f5f7; padding: 1rem; margin-bottom: 1rem; border-radius: 5px; font-family: monospace; }
-        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-        th, td { border: 1px solid #d1d5db; padding: 0.75rem; text-align: left; vertical-align: top; }
-        th { background: #f9fafb; font-weight: 600; width: 30%; }
-        pre { background: #f4f5f7; padding: 1rem; overflow-x: auto; border-radius: 5px; }
-        code { font-family: "JetBrains Mono", monospace; font-size: 0.9em; }
-        .RowTitle { font-weight: bold; }
+        /* Dokka System Variables & Design Tokens */
+        :root {
+            --dokka-bg: #ffffff;
+            --dokka-text: #19191c;
+            --dokka-muted: #5c5f66;
+            --dokka-border: #e5e7eb;
+            --dokka-link: #2762df;
+            --dokka-link-hover: #1d4ed8;
+            --dokka-code-bg: #f4f5f7;
+            
+            /* Highlighting Syntax Tokens */
+            --token-keyword: #0033b3;
+            --token-punctuation: #000000;
+            --token-operator: #787878;
+            --token-annotation: #802080;
+            --token-string: #067d17;
+            --token-number: #1750eb;
+            --token-constant: #871546;
+        }
+
+        /* Core Typography & Base Shell Specifications */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: var(--dokka-bg);
+            color: var(--dokka-text);
+            padding: 2rem; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            line-height: 1.5; 
+        }
+        
+        a { 
+            color: var(--dokka-link); 
+            text-decoration: none; 
+        }
+        a:hover { 
+            text-decoration: underline; 
+            color: var(--dokka-link-hover);
+        }
+
+        /* ContentGroup Layout Correction Rules */
+        /* By default, keep inline layouts flowing horizontally inside signatures */
+        .ContentGroup {
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 0;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Shift to explicit block constraints when a Group acts as a structural container */
+        div.ContentGroup.Cover,
+        div.ContentGroup.block,
+        div.ContentGroup.TabbedContent,
+        .ContentDivergentGroup {
+            display: block;
+            width: 100%;
+        }
+
+        /* Text Block Presentation Parameters */
+        .Bold, .Strong { font-weight: bold; }
+        .Italic, .Emphasis { font-style: italic; }
+        .Strikethrough { text-decoration: line-through; }
+        .Underlined { text-decoration: underline; }
+        .Paragraph { display: block; margin: 0.75rem 0; width: 100%; }
+        .Block { display: block; width: 100%; margin-bottom: 0.5rem; }
+        .Span { display: inline; }
+        
+        /* Font Matrix Specifications */
+        .Monospace, code, pre { 
+            font-family: "JetBrains Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace; 
+            font-size: 0.92em; 
+        }
+        .Indented { margin-left: 1.5rem; }
+        
+        /* Token Highlighting Formats */
+        .Keyword { color: var(--token-keyword); font-weight: bold; }
+        .Punctuation { color: var(--token-punctuation); }
+        .Operator { color: var(--token-operator); }
+        .Annotation { color: var(--token-annotation); }
+        .String { color: var(--token-string); }
+        .Number { color: var(--token-number); }
+        .Constant { color: var(--token-constant); }
+
+        /* Document Component Blocks */
+        .RowTitle { font-weight: 700; color: var(--dokka-text); }
+        .TabbedContent { border: 1px solid var(--dokka-border); border-radius: 8px; margin: 1.5rem 0; padding: 1rem; }
+        .TableHeader { background-color: #f9fafb; font-weight: 600; }
+        .Caption { font-size: 0.9rem; color: var(--dokka-muted); font-style: italic; margin-bottom: 0.5rem; text-align: left; }
+
+        /* Cover & Main Page Header Enclaves */
+        .Cover { 
+            border-bottom: 2px solid var(--dokka-border); 
+            padding-bottom: 1.5rem; 
+            margin-bottom: 2rem; 
+        }
+        .Cover h1 { font-size: 2.25rem; margin: 0 0 0.5rem 0; font-weight: 600; letter-spacing: -0.02em; }
+        
+        /* Table Geometry Definitions (ContentTable Overrides) */
+        table.table { 
+            border-collapse: collapse; 
+            width: 100%; 
+            margin: 1.5rem 0; 
+            border-radius: 6px;
+            border: 1px solid var(--dokka-border);
+            overflow: hidden;
+        }
+        table.table th, table.table td { 
+            padding: 0.75rem 1rem; 
+            text-align: left; 
+            vertical-align: top; 
+        }
+        table.table td {
+            border-top: 1px solid var(--dokka-border);
+        }
+        table.table th { 
+            background: #f9fafb; 
+            font-weight: 600; 
+            color: var(--dokka-muted);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Source Signature & Code Isolation Rules */
+        pre { 
+            background: var(--dokka-code-bg); 
+            padding: 1rem 1.25rem; 
+            overflow-x: auto; 
+            border-radius: 6px; 
+            border: 1px solid var(--dokka-border);
+            margin: 1rem 0;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        code { white-space: pre; color: inherit; }
+        
+        /* Ensure normal word breaks for inline code snippets wrapped in paragraphs or lists */
+        p code, li code, td code {
+            background: var(--dokka-code-bg);
+            padding: 0.15rem 0.35rem;
+            border-radius: 4px;
+            white-space: normal;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        /* Divergent Code Block Architecture */
+        .ContentDivergentInstance { 
+            background: var(--dokka-code-bg); 
+            border-left: 4px solid #4b5563;
+            padding: 0.75rem 1rem; 
+            margin-bottom: 1rem; 
+            border-radius: 0 6px 6px 0;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .divergent-before { font-size: 0.85rem; color: var(--dokka-muted); margin-bottom: 0.25rem; }
+        .divergent-core { display: block; width: 100%; }
+        .divergent-after { font-size: 0.85rem; color: var(--dokka-muted); margin-top: 0.5rem; border-top: 1px dashed var(--dokka-border); padding-top: 0.5rem; }
+
+        /* Platform Context Configurations */
+        .PlatformHintedContent {
+            border: 1px solid var(--dokka-border);
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem 0;
+            display: block;
+        }
+        .SourceSetDependentHint {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #4338ca;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.2rem 0.45rem;
+            border-radius: 9999px;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
     </style>
 </head>
 <body>
-    <main>
-        {# Pass the root content tree directly into the recursive component #}
-        {% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": content} %}
-    </main>
+    <div id="container">
+        <main>
+            {% include "./content_node.pebble" with {"node": content} %}
+        </main>
+    </div>
 </body>
 </html>
