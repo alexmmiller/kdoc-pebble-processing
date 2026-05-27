@@ -1,0 +1,61 @@
+<h1>{{ kind | capitalize }} {{ name }}</h1>
+<div class="signature">{{ signature }}</div>
+
+{% if supertypes is not empty %}
+    <p><strong>Supertypes: </strong> <code>{{ supertypes | join(", ") }}</code></p>
+{% endif %}
+
+{% if description is not empty %}
+    <div class="description">{{ description | raw }}</div>
+{% endif %}
+
+{% if constructors is not empty %}
+<div class="tabbed-section">
+    <h2>Constructors</h2>
+    <table class="table">
+        {% for ctor in constructors %}
+        <tr>
+            <td><a href="{{ ctor.url }}">{{ ctor.name }}</a></td>
+            <td>
+                <div class="signature">{{ ctor.signature }}</div>
+                <div class="brief">{{ ctor.brief | raw }}</div>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+{% if properties is not empty %}
+<div class="tabbed-section">
+    <h2>Properties</h2>
+    <table class="table">
+        {% for prop in properties %}
+        <tr>
+            <td><a href="{{ prop.url }}">{{ prop.name }}</a></td>
+            <td>
+                <div class="signature">{{ prop.signature }}</div>
+                <div class="brief">{{ prop.brief | raw }}</div>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+{% if functions is not empty %}
+<div class="tabbed-section">
+    <h2>Functions</h2>
+    <table class="table">
+        {% for func in functions %}
+        <tr>
+            <td><a href="{{ func.url }}">{{ func.name }}</a></td>
+            <td>
+                <div class="signature">{{ func.signature }}</div>
+                <div class="brief">{{ func.brief | raw }}</div>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}

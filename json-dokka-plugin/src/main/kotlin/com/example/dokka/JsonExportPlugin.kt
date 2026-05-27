@@ -1,20 +1,21 @@
 package com.example.dokka
 
 import org.jetbrains.dokka.CoreExtensions
+import org.jetbrains.dokka.base.DokkaBase
 import org.jetbrains.dokka.plugability.DokkaPlugin
 import org.jetbrains.dokka.plugability.DokkaPluginApiPreview
 import org.jetbrains.dokka.plugability.PluginApiPreviewAcknowledgement
 
 class JsonExportPlugin : DokkaPlugin() {
-    
-    // Registers the pass-through transformer execution step
-    val jsonDumpTransformer by extending {
-        CoreExtensions.documentableTransformer providing { context -> 
-            JsonDumpTransformer(context) 
-        }
+    private val dokkaBase by lazy { plugin<DokkaBase>() }
+
+    // Replaces Dokka's default HtmlRenderer with our JSON exporter
+    val jsonRenderer by extending {
+        CoreExtensions.renderer providing { context -> 
+            JsonRenderer(context) 
+        } override dokkaBase.htmlRenderer
     }
 
-    // Explicitly acknowledge that you are using Dokka's preview API
     @DokkaPluginApiPreview
     override fun pluginApiPreviewAcknowledgement() = PluginApiPreviewAcknowledgement
 }

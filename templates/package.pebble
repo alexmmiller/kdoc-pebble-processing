@@ -1,0 +1,38 @@
+<h1>Package {{ name }}</h1>
+{% if description is not empty %}
+    <div class="description">{{ description | raw }}</div>
+{% endif %}
+
+{% if types is not empty %}
+<div class="tabbed-section">
+    <h2>Types</h2>
+    <table class="table">
+        {% for cls in types %}
+        <tr>
+            <td><a href="{{ cls.url }}">{{ cls.name }}</a></td>
+            <td>
+                <div class="signature">{{ cls.signature }}</div>
+                <div class="brief">{{ cls.brief | raw }}</div>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}
+
+{% if functions is not empty %}
+<div class="tabbed-section">
+    <h2>Functions</h2>
+    <table class="table">
+        {% for func in functions %}
+        <tr>
+            <td><a href="{{ func.url }}">{{ func.name }}</a></td>
+            <td>
+                <div class="signature">{{ func.signature }}</div>
+                <div class="brief">{{ func.brief | raw }}</div>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endif %}

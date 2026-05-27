@@ -1,0 +1,118 @@
+{% if node is empty %}
+    {# Do nothing for null nodes #}
+
+{% elseif node.type == "ContentText" %}
+    {% if node.styles is not empty %}
+        <span class="{% for style in node.styles %}{{ style }} {% endfor %}">{{ node.text | raw }}</span>
+    {% else %}
+        {{ node.text | raw }}
+    {% endif %}
+
+{% elseif node.type == "ContentBreakLine" %}
+    <br/>
+
+{% elseif node.type == "ContentHeader" %}
+    <h{{ node.level }} class="{% for style in node.styles %}{{ style }} {% endfor %}">
+        {% for child in node.children %}
+            {% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}
+        {% endfor %}
+    </h{{ node.level }}>
+
+{% elseif node.type == "ContentCodeBlock" %}
+    <pre class="{% for style in node.styles %}{{ style }} {% endfor %}"><code class="{{ node.language | default('') }}">{% for child in node.children %}{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}{% endfor %}</code></pre>
+
+{% elseif node.type == "ContentCodeInline" %}
+    <code class="{{ node.language | default('') }} {% for style in node.styles %}{{ style }} {% endfor %}">{% for child in node.children %}{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}{% endfor %}</code>
+
+{% elseif node.type == "ContentDRILink" or node.type == "ContentResolvedLink" %}
+    <a href="{{ node.address | default('#') }}" class="{% for style in node.styles %}{{ style }} {% endfor %}">{% for child in node.children %}{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}{% endfor %}</a>
+
+{% elseif node.type == "ContentEmbeddedResource" %}
+    <img src="{{ node.address }}" alt="{{ node.altText | default('') }}" class="{% for style in node.styles %}{{ style }} {% endfor %}">
+    {% for child in node.children %}
+        {% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}
+    {% endfor %}
+
+{% elseif node.type == "ContentTable" %}
+    <table class="table {% for style in node.styles %}{{ style }} {% endfor %}">
+        {% if node.caption is not empty %}
+            <caption>{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": node.caption} %}</caption>
+        {% endif %}
+        
+        {% if node.header is not empty %}
+            <thead>
+                <tr>
+                    {% for th in node.header %}
+                        <th>{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": th} %}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+        {% endif %}
+        
+        <tbody>
+            {% for tr in node.children %}
+                <tr>
+                    {% for td in tr.children %}
+                        <td>{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": td} %}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+{% elseif node.type == "ContentList" %}
+    {% if node.ordered %}
+        <ol class="{% for style in node.styles %}{{ style }} {% endfor %}">
+    {% else %}
+        <ul class="{% for style in node.styles %}{{ style }} {% endfor %}">
+    {% endif %}
+    
+        {% for child in node.children %}
+            <li>{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}</li>
+        {% endfor %}
+        
+    {% if node.ordered %}</ol>{% else %}</ul>{% endif %}
+
+{% elseif node.type == "ContentDivergentGroup" %}
+    <div class="ContentDivergentGroup {% for style in node.styles %}{{ style }} {% endfor %}">
+        {% for child in node.children %}
+            {% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}
+        {% endfor %}
+    </div>
+
+{% elseif node.type == "ContentDivergentInstance" %}
+    <div class="ContentDivergentInstance {% for style in node.styles %}{{ style }} {% endfor %}">
+        {% if node.before is not empty %}
+            <div class="divergent-before">{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": node.before} %}</div>
+        {% endif %}
+        
+        <div class="divergent-core">{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": node.divergent} %}</div>
+        
+        {% if node.after is not empty %}
+            <div class="divergent-after">{% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": node.after} %}</div>
+        {% endif %}
+    </div>
+
+{% elseif node.type == "PlatformHintedContent" %}
+    <div class="PlatformHintedContent {% for style in node.styles %}{{ style }} {% endfor %}">
+        {% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": node.inner} %}
+    </div>
+
+{% elseif node.type == "ContentGroup" %}
+    <div class="ContentGroup {% for style in node.styles %}{{ style }} {% endfor %}">
+        {% for child in node.children %}
+            {% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}
+        {% endfor %}
+    </div>
+
+{% else %}
+    {# Fallback for any other ContentComposite or unknown node that has children #}
+    {% if node.children is not empty %}
+        <div class="{{ node.type | default('UnknownContentNode') }} {% for style in node.styles %}{{ style }} {% endfor %}">
+            {% for child in node.children %}
+                {% include "/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/templates/content_node.pebble" with {"node": child} %}
+            {% endfor %}
+        </div>
+    {% endif %}
+    
+{% endif %}

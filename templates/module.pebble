@@ -1,0 +1,13 @@
+<h1>Module {{ name }}</h1>
+
+<div class="tabbed-section">
+    <h2>Packages</h2>
+    <table class="table">
+        {% for pkg in packages %}
+        <tr>
+            <td><a href="{{ pkg.url }}">{{ pkg.name }}</a></td>
+            <td><div class="brief">{{ pkg.brief | raw }}</div></td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>

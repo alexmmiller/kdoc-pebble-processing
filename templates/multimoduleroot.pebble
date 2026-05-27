@@ -1,0 +1,15 @@
+<h1>All Modules</h1>
+<div class="description">
+    <p>This project is composed of multiple modules:</p>
+</div>
+
+<div class="tabbed-section">
+    <h2>Modules</h2>
+    <table class="table">
+        {% for module in modules %}
+        <tr>
+            <td><a href="{{ module.url }}">{{ module.name }}</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>

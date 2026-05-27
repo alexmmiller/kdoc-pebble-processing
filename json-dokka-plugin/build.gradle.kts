@@ -11,6 +11,9 @@ dependencies {
     // compileOnly because Dokka provides this at runtime
     compileOnly("org.jetbrains.dokka:dokka-core:1.9.20")
     
+    // ADD THIS LINE: Gives you access to DokkaBase and LocationProviders
+    compileOnly("org.jetbrains.dokka:dokka-base:1.9.20")
+    
     // implementation because we need Jackson bundled/accessible
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.3")
 }

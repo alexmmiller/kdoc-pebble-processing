@@ -1,0 +1,20 @@
+<h1>{{ kind }} {{ name }}</h1>
+
+<div class="signature">{{ signature }}</div>
+
+<div class="doc">{{ doc | raw }}</div>
+
+{% if parameters is not empty %}
+<h2 class="section-title">Parameters</h2>
+<table class="table">
+    {% for param in parameters %}
+    <tr>
+        <th>{{ param.name }}</th>
+        <td>
+            <code>{{ param.type }}</code><br>
+            {{ param.doc | raw }}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}
