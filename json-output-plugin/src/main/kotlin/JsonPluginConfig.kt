@@ -8,5 +8,5 @@ data class JsonPluginConfig(
     val logLevel: String = "info", 
     val omitFields: List<String> = emptyList(),
     val logFile: String? = null,
-    val replaceHtmlExtension: Boolean = true // <--- ADD THIS (Defaults to true to preserve current behavior)
+    val replaceHtmlExtension: Boolean = false // <--- ADD THIS (Defaults to true to preserve current behavior)
 ) : ConfigurableBlock

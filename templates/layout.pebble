@@ -1,199 +1,268 @@
+{# --- MACROS --- #}
+
+{% macro renderDoc(docMap) %}
+    {% if docMap != null %}
+        {% for entry in docMap %}
+            {% for tag in entry.value %}
+                <div class="doc-tag">
+                {% if tag.type == "Description" %}
+                    <div class="description">{{ tag.text | raw }}</div>
+                {% elseif tag.type == "Param" %}
+                    <div class="param">
+                        <span class="tag-name">@param {{ tag.name }}</span> {{ tag.text | raw }}
+                    </div>
+                {% elseif tag.type == "Return" %}
+                    <div class="return">
+                        <span class="tag-name">@return</span> {{ tag.text | raw }}
+                    </div>
+                {% else %}
+                    <div class="misc-tag">
+                        <span class="tag-name">@{{ tag.type }} {% if tag.name != null %}{{ tag.name }}{% endif %}</span> {{ tag.text | raw }}
+                    </div>
+                {% endif %}
+                </div>
+            {% endfor %}
+        {% endfor %}
+    {% endif %}
+{% endmacro %}
+
+{% macro renderType(typeDto) %}
+    {% if typeDto != null %}
+        {% if typeDto.kind == "Star" %}
+            *
+        {% elseif typeDto.kind == "Covariance" or typeDto.kind == "Contravariance" or typeDto.kind == "Invariance" %}
+            {{ renderType(typeDto.inner) }}
+        {% elseif typeDto.kind == "Nullable" or typeDto.kind == "DefinitelyNonNullable" %}
+            {{ renderType(typeDto.inner) }}{% if typeDto.kind == "Nullable" %}?{% endif %}
+        {% else %}
+            
+            {% set display = "Unknown" %}
+            {% if typeDto.presentableName != null and typeDto.presentableName != "" %}
+                {% set display = typeDto.presentableName %}
+            {% elseif typeDto.name != null and typeDto.name != "" %}
+                {% set display = typeDto.name %}
+            {% elseif typeDto.dri != null %}
+                {% set driParts = typeDto.dri | split("/") %}
+                {% if driParts | length > 1 and driParts[1] != "" %}
+                    {% set display = driParts[1] | replace({"%20": " "}) %}
+                {% endif %}
+            {% endif %}
+
+            {% if typeDto.url != null %}
+                <a href="{{ typeDto.url }}" class="type-link">{{ display }}</a>
+            {% else %}
+                <span class="type-name">{{ display }}</span>
+            {% endif %}
+            
+            {% if typeDto.projections is defined and typeDto.projections is not empty %}
+                &lt;{% for proj in typeDto.projections %}{{ renderType(proj) }}{% if not loop.last %}, {% endif %}{% endfor %}&gt;
+            {% endif %}
+
+        {% endif %}
+    {% endif %}
+{% endmacro %}
+
+{% macro renderMembers(title, members) %}
+    {% if members is not empty %}
+        <div class="member-section">
+            <h2>{{ title }}</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Summary</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member in members %}
+                    <tr>
+                        <td class="col-name">
+                            <a href="{{ member.url | default('#') }}">{{ member.name | default('Unknown') }}</a>
+                        </td>
+                        <td class="col-summary">
+                            {# Safely check if documentation exists (Multimodule nodes don't have it) #}
+                            {% if member.documentation is defined and member.documentation is not null %}
+                                {% for entry in member.documentation %}
+                                    {% for tag in entry.value %}
+                                        {% if tag.type == "Description" %}
+                                            {{ tag.text | raw }}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endmacro %}
+
+
+{# --- HTML TEMPLATE --- #}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ name }} - Documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ name }}</title>
     <style>
-        /* Dokka System Variables & Design Tokens */
         :root {
-            --dokka-bg: #ffffff;
-            --dokka-text: #19191c;
-            --dokka-muted: #5c5f66;
-            --dokka-border: #e5e7eb;
-            --dokka-link: #2762df;
-            --dokka-link-hover: #1d4ed8;
-            --dokka-code-bg: #f4f5f7;
-            
-            /* Highlighting Syntax Tokens */
-            --token-keyword: #0033b3;
-            --token-punctuation: #000000;
-            --token-operator: #787878;
-            --token-annotation: #802080;
-            --token-string: #067d17;
-            --token-number: #1750eb;
-            --token-constant: #871546;
+            --primary: #1976d2;
+            --text: #333333;
+            --bg: #ffffff;
+            --bg-alt: #f4f5f7;
+            --border: #e0e0e0;
+            --keyword: #0033b3;
+            --type-link: #20999D;
         }
-
-        /* Core Typography & Base Shell Specifications */
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: var(--dokka-bg);
-            color: var(--dokka-text);
-            padding: 2rem; 
-            max-width: 1200px; 
-            margin: 0 auto; 
-            line-height: 1.5; 
-        }
-        
-        a { 
-            color: var(--dokka-link); 
-            text-decoration: none; 
-        }
-        a:hover { 
-            text-decoration: underline; 
-            color: var(--dokka-link-hover);
-        }
-
-        /* ContentGroup Layout Correction Rules */
-        /* By default, keep inline layouts flowing horizontally inside signatures */
-        .ContentGroup {
-            display: inline-flex;
-            flex-wrap: wrap;
-            align-items: baseline;
-            gap: 0;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
             padding: 0;
+            color: var(--text);
+            background-color: var(--bg);
+            line-height: 1.6;
         }
-
-        /* Shift to explicit block constraints when a Group acts as a structural container */
-        div.ContentGroup.Cover,
-        div.ContentGroup.block,
-        div.ContentGroup.TabbedContent,
-        .ContentDivergentGroup {
-            display: block;
+        header {
+            background-color: var(--bg-alt);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .breadcrumb {
+            font-size: 0.9rem;
+            color: #555;
+        }
+        main {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            padding-bottom: 4rem;
+        }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; text-transform: capitalize; }
+        h2 { font-size: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; margin-top: 2.5rem; }
+        a { color: var(--primary); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        
+        /* Table Styling */
+        table {
             width: 100%;
-        }
-
-        /* Text Block Presentation Parameters */
-        .Bold, .Strong { font-weight: bold; }
-        .Italic, .Emphasis { font-style: italic; }
-        .Strikethrough { text-decoration: line-through; }
-        .Underlined { text-decoration: underline; }
-        .Paragraph { display: block; margin: 0.75rem 0; width: 100%; }
-        .Block { display: block; width: 100%; margin-bottom: 0.5rem; }
-        .Span { display: inline; }
-        
-        /* Font Matrix Specifications */
-        .Monospace, code, pre { 
-            font-family: "JetBrains Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace; 
-            font-size: 0.92em; 
-        }
-        .Indented { margin-left: 1.5rem; }
-        
-        /* Token Highlighting Formats */
-        .Keyword { color: var(--token-keyword); font-weight: bold; }
-        .Punctuation { color: var(--token-punctuation); }
-        .Operator { color: var(--token-operator); }
-        .Annotation { color: var(--token-annotation); }
-        .String { color: var(--token-string); }
-        .Number { color: var(--token-number); }
-        .Constant { color: var(--token-constant); }
-
-        /* Document Component Blocks */
-        .RowTitle { font-weight: 700; color: var(--dokka-text); }
-        .TabbedContent { border: 1px solid var(--dokka-border); border-radius: 8px; margin: 1.5rem 0; padding: 1rem; }
-        .TableHeader { background-color: #f9fafb; font-weight: 600; }
-        .Caption { font-size: 0.9rem; color: var(--dokka-muted); font-style: italic; margin-bottom: 0.5rem; text-align: left; }
-
-        /* Cover & Main Page Header Enclaves */
-        .Cover { 
-            border-bottom: 2px solid var(--dokka-border); 
-            padding-bottom: 1.5rem; 
-            margin-bottom: 2rem; 
-        }
-        .Cover h1 { font-size: 2.25rem; margin: 0 0 0.5rem 0; font-weight: 600; letter-spacing: -0.02em; }
-        
-        /* Table Geometry Definitions (ContentTable Overrides) */
-        table.table { 
-            border-collapse: collapse; 
-            width: 100%; 
-            margin: 1.5rem 0; 
-            border-radius: 6px;
-            border: 1px solid var(--dokka-border);
-            overflow: hidden;
-        }
-        table.table th, table.table td { 
-            padding: 0.75rem 1rem; 
-            text-align: left; 
-            vertical-align: top; 
-        }
-        table.table td {
-            border-top: 1px solid var(--dokka-border);
-        }
-        table.table th { 
-            background: #f9fafb; 
-            font-weight: 600; 
-            color: var(--dokka-muted);
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        /* Source Signature & Code Isolation Rules */
-        pre { 
-            background: var(--dokka-code-bg); 
-            padding: 1rem 1.25rem; 
-            overflow-x: auto; 
-            border-radius: 6px; 
-            border: 1px solid var(--dokka-border);
+            border-collapse: collapse;
             margin: 1rem 0;
-            display: block;
-            width: 100%;
-            box-sizing: border-box;
+            font-size: 0.95rem;
         }
-        code { white-space: pre; color: inherit; }
-        
-        /* Ensure normal word breaks for inline code snippets wrapped in paragraphs or lists */
-        p code, li code, td code {
-            background: var(--dokka-code-bg);
-            padding: 0.15rem 0.35rem;
-            border-radius: 4px;
-            white-space: normal;
-            border: 1px solid rgba(0,0,0,0.05);
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
         }
-
-        /* Divergent Code Block Architecture */
-        .ContentDivergentInstance { 
-            background: var(--dokka-code-bg); 
-            border-left: 4px solid #4b5563;
-            padding: 0.75rem 1rem; 
-            margin-bottom: 1rem; 
-            border-radius: 0 6px 6px 0;
-            display: block;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .divergent-before { font-size: 0.85rem; color: var(--dokka-muted); margin-bottom: 0.25rem; }
-        .divergent-core { display: block; width: 100%; }
-        .divergent-after { font-size: 0.85rem; color: var(--dokka-muted); margin-top: 0.5rem; border-top: 1px dashed var(--dokka-border); padding-top: 0.5rem; }
-
-        /* Platform Context Configurations */
-        .PlatformHintedContent {
-            border: 1px solid var(--dokka-border);
-            border-radius: 6px;
-            padding: 1rem;
-            margin: 1rem 0;
-            display: block;
-        }
-        .SourceSetDependentHint {
-            display: inline-block;
-            background: #e0e7ff;
-            color: #4338ca;
-            font-size: 0.72rem;
+        th {
+            background-color: var(--bg-alt);
             font-weight: 600;
-            padding: 0.2rem 0.45rem;
-            border-radius: 9999px;
-            margin-bottom: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
+        }
+        .col-name { width: 30%; font-weight: 500; }
+        
+        /* Typography */
+        .keyword { color: var(--keyword); font-weight: bold; }
+        .type-link { color: var(--type-link); }
+        .type-name { color: var(--text); }
+        
+        /* Signatures */
+        .signature {
+            background-color: var(--bg-alt);
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: "JetBrains Mono", Consolas, monospace;
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+        
+        /* Documentation Blocks */
+        .doc-block { margin: 1.5rem 0; font-size: 1.05rem; }
+        .doc-tag { margin-bottom: 0.5rem; }
+        .tag-name { font-weight: 600; color: #555; margin-right: 0.5rem; }
+        
+        code {
+            background-color: rgba(0,0,0,0.05);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: Consolas, monospace;
+            font-size: 0.9em;
+        }
+        pre > code {
+            display: block;
+            padding: 1rem;
+            overflow-x: auto;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <main>
-            {% include "./content_node.pebble" with {"node": content} %}
-        </main>
-    </div>
+    <header>
+        <div class="breadcrumb">
+            API Documentation / {{ name }}
+        </div>
+    </header>
+    
+    <main>
+        <h1><span class="keyword">{{ kind }}</span> {{ name }}</h1>
+
+        {# Render Signatures for Functions and Properties #}
+        {% if kind == "function" %}
+            <div class="signature">
+                <span class="keyword">fun</span> {{ name }}({% if parameters is not empty %}<br>{% endif %}
+                {% for param in parameters %}
+                    &nbsp;&nbsp;&nbsp;&nbsp;{{ param.name }}: {{ renderType(param.type) }}{% if not loop.last %},<br>{% endif %}
+                {% endfor %}
+                {% if parameters is not empty %}<br>{% endif %}): {{ renderType(type) }}
+            </div>
+        {% elseif kind == "property" %}
+            <div class="signature">
+                <span class="keyword">val</span> {{ name }}: {{ renderType(type) }}
+            </div>
+        {% endif %}
+
+        {# Render Document Tag list #}
+        <div class="doc-block">
+            {{ renderDoc(documentation) }}
+        </div>
+
+        {# HIGHER LEVEL NODES (Multimodule, Module, Package) #}
+        {% if modules is defined and modules is not null %}
+            {{ renderMembers("Modules", modules) }}
+        {% endif %}
+
+        {% if packages is defined and packages is not null %}
+            {{ renderMembers("Packages", packages) }}
+        {% endif %}
+
+        {# STANDARD MEMBERS #}
+        {% if classlikes is defined and classlikes is not null %}
+            {{ renderMembers("Types", classlikes) }}
+        {% endif %}
+        
+        {% if typeAliases is defined and typeAliases is not null %}
+            {{ renderMembers("Type Aliases", typeAliases) }}
+        {% endif %}
+
+        {% if constructors is defined and constructors is not null %}
+            {{ renderMembers("Constructors", constructors) }}
+        {% endif %}
+
+        {% if properties is defined and properties is not null %}
+            {{ renderMembers("Properties", properties) }}
+        {% endif %}
+
+        {% if functions is defined and functions is not null %}
+            {{ renderMembers("Functions", functions) }}
+        {% endif %}
+
+        {% if entries is defined and entries is not null %}
+            {{ renderMembers("Enum Entries", entries) }}
+        {% endif %}
+
+    </main>
 </body>
 </html>
