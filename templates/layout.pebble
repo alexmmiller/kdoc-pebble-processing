@@ -62,6 +62,79 @@
     {% endif %}
 {% endmacro %}
 
+{# Dynamically rebuilds the Kotlin signature for table summaries & the main page header #}
+{% macro renderTableSignature(member) %}
+    <div class="table-signature">
+        
+        {# 1. Annotations #}
+        {% if member.extras is defined and member.extras.annotations is not empty %}
+            {% for entry in member.extras.annotations %}
+                {% if loop.first %}
+                    {% for anno in entry.value %}
+                        {% set annoName = anno.dri | split("/") %}
+                        <div class="annotation">@{{ annoName[1] }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
+        {# 2. Standard Visibility / Modality #}
+        {% if member.modifier is defined and member.modifier is not empty %}
+            {% for entry in member.modifier %}
+                {% if loop.first %}
+                    {% if entry.value != "final" and entry.value != "public" %}
+                        <span class="keyword">{{ entry.value }}</span> 
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
+        {# 3. Additional Modifiers #}
+        {% if member.extras is defined and member.extras.additionalModifiers is not empty %}
+            {% for entry in member.extras.additionalModifiers %}
+                {% if loop.first %}
+                    {% for mod in entry.value %}
+                        <span class="keyword">{{ mod }}</span> 
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
+        {# 4. Core Signature Definition #}
+        {% if member.kind == "function" %}
+            <span class="keyword">fun</span> 
+            {% if member.generics is defined and member.generics is not empty %}
+                &lt;{% for gen in member.generics %}{{ gen.name }}{% if not loop.last %}, {% endif %}{% endfor %}&gt; 
+            {% endif %}
+            {% if member.receiver is defined and member.receiver is not null %}
+                {{ renderType(member.receiver.type) }}.
+            {% endif %}
+            {{ member.name }}({% if member.parameters is defined and member.parameters is not null %}{% for param in member.parameters %}{{ param.name }}: {{ renderType(param.type) }}{% if param.extras is defined and param.extras.defaultValues is not empty %} = {% for dEntry in param.extras.defaultValues %}{% if loop.first %}{{ dEntry.value | replace({"\"": "&quot;"}) }}{% endif %}{% endfor %}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}){% if member.type is defined and member.type is not null %}: {{ renderType(member.type) }}{% endif %}
+
+        {% elseif member.kind == "property" %}
+            <span class="keyword">val</span> 
+            {% if member.receiver is defined and member.receiver is not null %}
+                {{ renderType(member.receiver.type) }}.
+            {% endif %}
+            {{ member.name }}{% if member.type is defined and member.type is not null %}: {{ renderType(member.type) }}{% endif %}
+
+        {% elseif member.kind == "typeAlias" %}
+            <span class="keyword">typealias</span> {{ member.name }} = 
+            {% if member.underlyingType is defined and member.underlyingType is not null %}
+                {% for entry in member.underlyingType %}
+                    {% if loop.first %}
+                        {{ renderType(entry.value) }}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            
+        {% elseif member.kind == "class" or member.kind == "interface" or member.kind == "object" or member.kind == "enum" %}
+            <span class="keyword">{{ member.kind }}</span> {{ member.name }}
+        {% endif %}
+    </div>
+{% endmacro %}
+
+
 {% macro renderMembers(title, members) %}
     {% if members is not empty %}
         <div class="member-section">
@@ -75,23 +148,29 @@
                 </thead>
                 <tbody>
                     {% for member in members %}
+                    {# Filter out Obvious Members (equals, toString, hashCode) #}
+                    {% if member.extras is not defined or not member.extras.isObviousMember %}
                     <tr>
                         <td class="col-name">
                             <a href="{{ member.url | default('#') }}">{{ member.name | default('Unknown') }}</a>
                         </td>
                         <td class="col-summary">
-                            {# Safely check if documentation exists (Multimodule nodes don't have it) #}
+                            
+                            {{ renderTableSignature(member) }}
+                            
                             {% if member.documentation is defined and member.documentation is not null %}
                                 {% for entry in member.documentation %}
                                     {% for tag in entry.value %}
                                         {% if tag.type == "Description" %}
-                                            {{ tag.text | raw }}
+                                            <div class="brief">{{ tag.text | raw }}</div>
                                         {% endif %}
                                     {% endfor %}
                                 {% endfor %}
                             {% endif %}
+
                         </td>
                     </tr>
+                    {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -116,6 +195,7 @@
             --border: #e0e0e0;
             --keyword: #0033b3;
             --type-link: #20999D;
+            --annotation: #808000;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -145,7 +225,6 @@
         a { color: var(--primary); text-decoration: none; }
         a:hover { text-decoration: underline; }
         
-        /* Table Styling */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -164,12 +243,11 @@
         }
         .col-name { width: 30%; font-weight: 500; }
         
-        /* Typography */
         .keyword { color: var(--keyword); font-weight: bold; }
         .type-link { color: var(--type-link); }
         .type-name { color: var(--text); }
+        .annotation { color: var(--annotation); font-weight: normal; margin-bottom: 0.2rem; }
         
-        /* Signatures */
         .signature {
             background-color: var(--bg-alt);
             padding: 1rem;
@@ -180,10 +258,17 @@
             border: 1px solid var(--border);
         }
         
-        /* Documentation Blocks */
+        .table-signature {
+            font-family: "JetBrains Mono", Consolas, monospace;
+            font-size: 0.9em;
+            margin-bottom: 0.5rem;
+            color: #000;
+        }
+        
         .doc-block { margin: 1.5rem 0; font-size: 1.05rem; }
         .doc-tag { margin-bottom: 0.5rem; }
         .tag-name { font-weight: 600; color: #555; margin-right: 0.5rem; }
+        .brief { color: #444; margin-top: 0.2rem; }
         
         code {
             background-color: rgba(0,0,0,0.05);
@@ -209,22 +294,13 @@
     <main>
         <h1><span class="keyword">{{ kind }}</span> {{ name }}</h1>
 
-        {# Render Signatures for Functions and Properties #}
-        {% if kind == "function" %}
+        {# If this is an actual documentable, render its own signature block at the top #}
+        {% if kind == "function" or kind == "property" or kind == "typeAlias" or kind == "class" or kind == "interface" or kind == "object" or kind == "enum" %}
             <div class="signature">
-                <span class="keyword">fun</span> {{ name }}({% if parameters is not empty %}<br>{% endif %}
-                {% for param in parameters %}
-                    &nbsp;&nbsp;&nbsp;&nbsp;{{ param.name }}: {{ renderType(param.type) }}{% if not loop.last %},<br>{% endif %}
-                {% endfor %}
-                {% if parameters is not empty %}<br>{% endif %}): {{ renderType(type) }}
-            </div>
-        {% elseif kind == "property" %}
-            <div class="signature">
-                <span class="keyword">val</span> {{ name }}: {{ renderType(type) }}
+                {{ renderTableSignature(_context) }}
             </div>
         {% endif %}
 
-        {# Render Document Tag list #}
         <div class="doc-block">
             {{ renderDoc(documentation) }}
         </div>

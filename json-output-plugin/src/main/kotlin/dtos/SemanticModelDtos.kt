@@ -7,9 +7,26 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class TagWrapperDto(
-    val type: String,        // E.g., "Description", "Param", "Return", "Author"
-    val text: String,        // The cleanly extracted human-readable text
-    val name: String? = null // Holds the parameter name for @param, or exception name for @throws
+    val type: String,
+    val text: String,
+    val name: String? = null
+)
+
+// --- Extras & Properties ---
+
+@Serializable
+data class AnnotationWrapperDto(
+    val dri: String,
+    val params: Map<String, String>
+)
+
+@Serializable
+data class ExtrasDto(
+    val annotations: Map<String, List<AnnotationWrapperDto>> = emptyMap(),
+    val defaultValues: Map<String, String> = emptyMap(),
+    val additionalModifiers: Map<String, List<String>> = emptyMap(),
+    val isObviousMember: Boolean = false,
+    val isException: Boolean = false
 )
 
 // --- Bounds & Projections (Types) ---
@@ -90,7 +107,7 @@ sealed class DocumentableDto {
     abstract val documentation: Map<String, List<TagWrapperDto>>
     abstract val sourceSets: List<String>
     abstract val expectPresentInSet: String?
-    abstract val extras: List<String> 
+    abstract val extras: ExtrasDto
 }
 
 @Serializable
@@ -102,8 +119,8 @@ data class ModuleDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
-    val packages: List<PackageDto>
+    override val extras: ExtrasDto,
+    val packages: List<DocumentableDto>
 ) : DocumentableDto()
 
 @Serializable
@@ -115,11 +132,11 @@ data class PackageDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
-    val functions: List<FunctionDto>,
-    val properties: List<PropertyDto>,
+    override val extras: ExtrasDto,
+    val functions: List<DocumentableDto>,
+    val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
-    val typeAliases: List<TypeAliasDto>
+    val typeAliases: List<DocumentableDto>
 ) : DocumentableDto()
 
 @Serializable
@@ -131,10 +148,10 @@ data class ClassDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
-    val constructors: List<FunctionDto>,
-    val functions: List<FunctionDto>,
-    val properties: List<PropertyDto>,
+    override val extras: ExtrasDto,
+    val constructors: List<DocumentableDto>,
+    val functions: List<DocumentableDto>,
+    val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
     val sources: Map<String, String>,
     val visibility: Map<String, String>,
@@ -143,7 +160,7 @@ data class ClassDto(
     val supertypes: Map<String, List<TypeConstructorWithKindDto>>,
     val modifier: Map<String, String>,
     val isExpectActual: Boolean,
-    val typealiases: List<TypeAliasDto>
+    val typealiases: List<DocumentableDto>
 ) : DocumentableDto()
 
 @Serializable
@@ -155,18 +172,18 @@ data class EnumDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
-    val entries: List<EnumEntryDto>,
-    val constructors: List<FunctionDto>,
-    val functions: List<FunctionDto>,
-    val properties: List<PropertyDto>,
+    override val extras: ExtrasDto,
+    val entries: List<DocumentableDto>,
+    val constructors: List<DocumentableDto>,
+    val functions: List<DocumentableDto>,
+    val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
     val sources: Map<String, String>,
     val visibility: Map<String, String>,
     val companion: ObjectDto?,
     val supertypes: Map<String, List<TypeConstructorWithKindDto>>,
     val isExpectActual: Boolean,
-    val typealiases: List<TypeAliasDto>
+    val typealiases: List<DocumentableDto>
 ) : DocumentableDto()
 
 @Serializable
@@ -178,9 +195,9 @@ data class EnumEntryDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
-    val functions: List<FunctionDto>,
-    val properties: List<PropertyDto>,
+    override val extras: ExtrasDto,
+    val functions: List<DocumentableDto>,
+    val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>
 ) : DocumentableDto()
 
@@ -193,7 +210,7 @@ data class FunctionDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
+    override val extras: ExtrasDto,
     val isConstructor: Boolean,
     val parameters: List<ParameterDto>,
     val sources: Map<String, String>,
@@ -215,9 +232,9 @@ data class InterfaceDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
-    val functions: List<FunctionDto>,
-    val properties: List<PropertyDto>,
+    override val extras: ExtrasDto,
+    val functions: List<DocumentableDto>,
+    val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
     val sources: Map<String, String>,
     val visibility: Map<String, String>,
@@ -226,7 +243,7 @@ data class InterfaceDto(
     val supertypes: Map<String, List<TypeConstructorWithKindDto>>,
     val modifier: Map<String, String>,
     val isExpectActual: Boolean,
-    val typealiases: List<TypeAliasDto>
+    val typealiases: List<DocumentableDto>
 ) : DocumentableDto()
 
 @Serializable
@@ -238,15 +255,15 @@ data class ObjectDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
-    val functions: List<FunctionDto>,
-    val properties: List<PropertyDto>,
+    override val extras: ExtrasDto,
+    val functions: List<DocumentableDto>,
+    val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
     val sources: Map<String, String>,
     val visibility: Map<String, String>,
     val supertypes: Map<String, List<TypeConstructorWithKindDto>>,
     val isExpectActual: Boolean,
-    val typealiases: List<TypeAliasDto>
+    val typealiases: List<DocumentableDto>
 ) : DocumentableDto()
 
 @Serializable
@@ -258,14 +275,14 @@ data class AnnotationDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
-    val functions: List<FunctionDto>,
-    val properties: List<PropertyDto>,
+    override val extras: ExtrasDto,
+    val functions: List<DocumentableDto>,
+    val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
     val sources: Map<String, String>,
     val visibility: Map<String, String>,
     val companion: ObjectDto?,
-    val constructors: List<FunctionDto>,
+    val constructors: List<DocumentableDto>,
     val generics: List<TypeParameterDto>,
     val isExpectActual: Boolean
 ) : DocumentableDto()
@@ -279,7 +296,7 @@ data class PropertyDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
+    override val extras: ExtrasDto,
     val sources: Map<String, String>,
     val visibility: Map<String, String>,
     val type: BoundDto,
@@ -301,7 +318,7 @@ data class ParameterDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
+    override val extras: ExtrasDto,
     val type: BoundDto
 ) : DocumentableDto()
 
@@ -314,7 +331,7 @@ data class TypeParameterDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
+    override val extras: ExtrasDto,
     val bounds: List<BoundDto>,
     val variantTypeParameter: VarianceDto
 ) : DocumentableDto()
@@ -328,7 +345,7 @@ data class TypeAliasDto(
     override val documentation: Map<String, List<TagWrapperDto>>,
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
-    override val extras: List<String>,
+    override val extras: ExtrasDto,
     val type: BoundDto,
     val underlyingType: Map<String, BoundDto>,
     val visibility: Map<String, String>,
@@ -353,6 +370,6 @@ data class MultimoduleRootDto(
     override val documentation: Map<String, List<TagWrapperDto>> = emptyMap(),
     override val sourceSets: List<String> = emptyList(),
     override val expectPresentInSet: String? = null,
-    override val extras: List<String> = emptyList(),
+    override val extras: ExtrasDto = ExtrasDto(),
     val modules: List<ModuleReferenceDto>
 ) : DocumentableDto()

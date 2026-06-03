@@ -2,26 +2,25 @@ package my.dokka.plugin
 
 import my.dokka.plugin.dtos.*
 import org.jetbrains.dokka.base.resolvers.local.LocationProvider
+import org.jetbrains.dokka.links.DRI
 import org.jetbrains.dokka.model.*
 import org.jetbrains.dokka.model.doc.*
+import org.jetbrains.dokka.model.properties.PropertyContainer
 import org.jetbrains.dokka.pages.PageNode
-import org.jetbrains.dokka.links.DRI
 
 class ModelMapper(
     private val locationProvider: LocationProvider,
     private val contextNode: PageNode,
     private val logger: PluginLogger,
-    private val replaceHtmlExtension: Boolean // <--- ADD THIS
+    private val replaceHtmlExtension: Boolean
 ) {
 
     fun mapToDto(doc: Documentable): DocumentableDto? {
         logger.debug("Mapping documentable ${doc.name} of type ${doc::class.java.simpleName}")
         
         val displaySourceSets = doc.sourceSets.map { it.toDisplaySourceSet() }.toSet()
-        
         var url = locationProvider.resolve(doc.dri, displaySourceSets, contextNode)
         
-        // Use the config flag here
         if (replaceHtmlExtension && url != null && !url.startsWith("http")) {
             url = url.replace(".html", ".json")
         }
@@ -34,27 +33,27 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation),
                 sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(),
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
-                packages = doc.packages.mapNotNull { mapToDto(it) as? PackageDto }
+                extras = mapExtras(doc.extra),
+                packages = doc.packages.mapNotNull { mapToDto(it) }
             )
             is DPackage -> PackageDto(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
-                functions = doc.functions.mapNotNull { mapToDto(it) as? FunctionDto },
-                properties = doc.properties.mapNotNull { mapToDto(it) as? PropertyDto },
+                extras = mapExtras(doc.extra),
+                functions = doc.functions.mapNotNull { mapToDto(it) },
+                properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
-                typeAliases = doc.typealiases.mapNotNull { mapToDto(it) as? TypeAliasDto }
+                typeAliases = doc.typealiases.mapNotNull { mapToDto(it) }
             )
             is DClass -> ClassDto(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
-                constructors = doc.constructors.mapNotNull { mapToDto(it) as? FunctionDto },
-                functions = doc.functions.mapNotNull { mapToDto(it) as? FunctionDto },
-                properties = doc.properties.mapNotNull { mapToDto(it) as? PropertyDto },
+                extras = mapExtras(doc.extra),
+                constructors = doc.constructors.mapNotNull { mapToDto(it) },
+                functions = doc.functions.mapNotNull { mapToDto(it) },
+                properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },
@@ -71,11 +70,11 @@ class ModelMapper(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
-                entries = doc.entries.mapNotNull { mapToDto(it) as? EnumEntryDto },
-                constructors = doc.constructors.mapNotNull { mapToDto(it) as? FunctionDto },
-                functions = doc.functions.mapNotNull { mapToDto(it) as? FunctionDto },
-                properties = doc.properties.mapNotNull { mapToDto(it) as? PropertyDto },
+                extras = mapExtras(doc.extra),
+                entries = doc.entries.mapNotNull { mapToDto(it) },
+                constructors = doc.constructors.mapNotNull { mapToDto(it) },
+                functions = doc.functions.mapNotNull { mapToDto(it) },
+                properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },
@@ -90,16 +89,16 @@ class ModelMapper(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
-                functions = doc.functions.mapNotNull { mapToDto(it) as? FunctionDto },
-                properties = doc.properties.mapNotNull { mapToDto(it) as? PropertyDto },
+                extras = mapExtras(doc.extra),
+                functions = doc.functions.mapNotNull { mapToDto(it) },
+                properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) }
             )
             is DFunction -> FunctionDto(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
+                extras = mapExtras(doc.extra),
                 isConstructor = doc.isConstructor,
                 parameters = doc.parameters.mapNotNull { mapToDto(it) as? ParameterDto },
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
@@ -115,9 +114,9 @@ class ModelMapper(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
-                functions = doc.functions.mapNotNull { mapToDto(it) as? FunctionDto },
-                properties = doc.properties.mapNotNull { mapToDto(it) as? PropertyDto },
+                extras = mapExtras(doc.extra),
+                functions = doc.functions.mapNotNull { mapToDto(it) },
+                properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },
@@ -134,9 +133,9 @@ class ModelMapper(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
-                functions = doc.functions.mapNotNull { mapToDto(it) as? FunctionDto },
-                properties = doc.properties.mapNotNull { mapToDto(it) as? PropertyDto },
+                extras = mapExtras(doc.extra),
+                functions = doc.functions.mapNotNull { mapToDto(it) },
+                properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },
@@ -150,14 +149,14 @@ class ModelMapper(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
-                functions = doc.functions.mapNotNull { mapToDto(it) as? FunctionDto },
-                properties = doc.properties.mapNotNull { mapToDto(it) as? PropertyDto },
+                extras = mapExtras(doc.extra),
+                functions = doc.functions.mapNotNull { mapToDto(it) },
+                properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },
                 companion = doc.companion?.let { mapToDto(it) as? ObjectDto },
-                constructors = doc.constructors.mapNotNull { mapToDto(it) as? FunctionDto },
+                constructors = doc.constructors.mapNotNull { mapToDto(it) },
                 generics = doc.generics.mapNotNull { mapToDto(it) as? TypeParameterDto },
                 isExpectActual = doc.isExpectActual
             )
@@ -165,7 +164,7 @@ class ModelMapper(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
+                extras = mapExtras(doc.extra),
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },
                 type = mapBound(doc.type, displaySourceSets),
@@ -181,14 +180,14 @@ class ModelMapper(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
+                extras = mapExtras(doc.extra),
                 type = mapBound(doc.type, displaySourceSets)
             )
             is DTypeParameter -> TypeParameterDto(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
+                extras = mapExtras(doc.extra),
                 bounds = doc.bounds.map { mapBound(it, displaySourceSets) },
                 variantTypeParameter = mapProjection(doc.variantTypeParameter, displaySourceSets) as VarianceDto
             )
@@ -196,7 +195,7 @@ class ModelMapper(
                 dri = doc.dri.toString(), name = doc.name, url = url,
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
-                extras = doc.extra.allOfType<Any>().map { it::class.java.simpleName },
+                extras = mapExtras(doc.extra),
                 type = mapBound(doc.type, displaySourceSets),
                 underlyingType = mapSourceSetDependent(doc.underlyingType) { ss, it -> mapBound(it, setOf(ss.toDisplaySourceSet())) },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },
@@ -205,6 +204,56 @@ class ModelMapper(
             )
             else -> null
         }
+    }
+
+    private fun mapExtras(extra: PropertyContainer<*>): ExtrasDto {
+        val isObviousMember = extra.allOfType<Any>().any { it::class.java.simpleName == "ObviousMember" }
+        val isException = extra.allOfType<Any>().any { it::class.java.simpleName == "ExceptionInSupertypes" }
+
+        val annotationsMap = extra.allOfType<org.jetbrains.dokka.model.Annotations>().firstOrNull()?.directAnnotations?.entries?.associate { (ss, list) ->
+            ss.sourceSetID.toString() to list.map { anno ->
+                AnnotationWrapperDto(
+                    dri = anno.dri.toString(),
+                    params = anno.params.entries.associate { (k, v) -> k to v.toString() }
+                )
+            }
+        } ?: emptyMap()
+
+        val defaultValuesMap = mutableMapOf<String, String>()
+        extra.allOfType<Any>().firstOrNull { it::class.java.simpleName == "DefaultValue" }?.let { defValue ->
+            try {
+                val valueMethod = defValue::class.java.methods.firstOrNull { it.name == "getValue" || it.name == "getExpression" }
+                val valueObj = valueMethod?.invoke(defValue)
+                if (valueObj is Map<*, *>) {
+                    valueObj.forEach { (ss, expr) ->
+                        val ssName = ss?.let { it::class.java.getMethod("getSourceSetID").invoke(it).toString() } ?: "unknown"
+                        defaultValuesMap[ssName] = expr.toString()
+                    }
+                } else if (valueObj != null) {
+                    defaultValuesMap["unknown"] = valueObj.toString()
+                }
+            } catch (e: Exception) {
+                logger.debug("Failed to safely extract DefaultValue: ${e.message}")
+            }
+        }
+
+        val additionalModifiersMap = extra.allOfType<org.jetbrains.dokka.model.AdditionalModifiers>().firstOrNull()?.content?.entries?.associate { (ss, set) ->
+            ss.sourceSetID.toString() to set.map { modifier ->
+                try {
+                    modifier::class.java.getMethod("getName").invoke(modifier).toString().lowercase()
+                } catch (e: Exception) {
+                    modifier.toString().substringAfterLast("$").substringBefore("@").lowercase()
+                }
+            }
+        } ?: emptyMap()
+
+        return ExtrasDto(
+            annotations = annotationsMap,
+            defaultValues = defaultValuesMap,
+            additionalModifiers = additionalModifiersMap,
+            isObviousMember = isObviousMember,
+            isException = isException
+        )
     }
 
     private fun mapProjection(proj: Projection, sourceSets: Set<DisplaySourceSet>): ProjectionDto {
@@ -221,21 +270,19 @@ class ModelMapper(
 
     private fun mapBound(bound: Bound, sourceSets: Set<DisplaySourceSet>): BoundDto {
         
-    fun resolveUrl(dri: DRI?): String? {
-                if (dri == null) return null
-                var url = locationProvider.resolve(dri, sourceSets, contextNode)
-                
-                // Use the config flag here
-                if (replaceHtmlExtension && url != null && !url.startsWith("http")) {
-                    url = url.replace(".html", ".json")
-                }
-                
-                if (url != null) logger.debug("Resolved TYPE URL for $dri: $url")
-                return url
+        fun resolveUrl(dri: DRI?): String? {
+            if (dri == null) return null
+            var url = locationProvider.resolve(dri, sourceSets, contextNode)
+            if (replaceHtmlExtension && url != null && !url.startsWith("http")) {
+                url = url.replace(".html", ".json")
             }
+            if (url != null) logger.debug("Resolved TYPE URL for $dri: $url")
+            return url
+        }
+
         return when (bound) {
             is TypeParameter -> TypeParameterBoundDto(bound.dri.toString(), bound.name, bound.presentableName, resolveUrl(bound.dri))
-            is Nullable -> NullableDto(mapBound(bound.inner, sourceSets), resolveUrl(null)) // Delegate null url to prevent nesting URLs on wrappers
+            is Nullable -> NullableDto(mapBound(bound.inner, sourceSets), resolveUrl(null))
             is DefinitelyNonNullable -> DefinitelyNonNullableDto(mapBound(bound.inner, sourceSets))
             is TypeAliased -> TypeAliasedDto(mapBound(bound.typeAlias, sourceSets), mapBound(bound.inner, sourceSets), resolveUrl(null))
             is PrimitiveJavaType -> PrimitiveJavaTypeDto(bound.name)
@@ -264,7 +311,7 @@ class ModelMapper(
         return docs.entries.associate { (sourceSet, node) ->
             val tags = node.children.map { tagWrapper ->
                 TagWrapperDto(
-                    type = tagWrapper::class.java.simpleName, // E.g., "Description", "Param", "Return"
+                    type = tagWrapper::class.java.simpleName,
                     text = extractText(tagWrapper.root).trim(),
                     name = if (tagWrapper is NamedTagWrapper) tagWrapper.name else null
                 )
@@ -280,7 +327,18 @@ class ModelMapper(
             is CodeBlock -> "```\n" + tag.children.joinToString("") { extractText(it) } + "\n```"
             is P -> tag.children.joinToString("") { extractText(it) } + "\n\n"
             is Br -> "\n"
-            else -> tag.children.joinToString("") { extractText(it) }
+            is A -> {
+                val href = tag.params["href"] ?: ""
+                "[" + tag.children.joinToString("") { extractText(it) } + "]($href)"
+            }
+            is CustomDocTag -> {
+                logger.debug("Encountered CustomDocTag: name=${tag.name}")
+                tag.children.joinToString("") { extractText(it) }
+            }
+            else -> {
+                logger.warn("Unhandled DocTag type: ${tag::class.java.simpleName}. Falling back to raw children.")
+                tag.children.joinToString("") { extractText(it) }
+            }
         }
     }
 
