@@ -3,70 +3,56 @@
 {% macro renderDoc(docMap) %}
     {% if docMap != null %}
         {% for entry in docMap %}
-            {% for tag in entry.value %}
-                <div class="doc-tag">
-                {% if tag.type == "Description" %}
-                    <div class="description">{{ tag.text | raw }}</div>
-                {% elseif tag.type == "Param" %}
-                    <div class="param">
-                        <span class="tag-name">@param {{ tag.name }}</span> {{ tag.text | raw }}
+            {% if loop.first %} 
+                {% for tag in entry.value %}
+                    <div class="doc-tag">
+                    {% if tag.type == "Description" %}
+                        <div class="description">{{ tag.text | raw }}</div>
+                    {% elseif tag.type == "Param" %}
+                        <div class="param">
+                            <span class="tag-name">@param {{ tag.name }}</span> {{ tag.text | raw }}
+                        </div>
+                    {% elseif tag.type == "Return" %}
+                        <div class="return">
+                            <span class="tag-name">@return</span> {{ tag.text | raw }}
+                        </div>
+                    {% else %}
+                        <div class="misc-tag">
+                            <span class="tag-name">@{{ tag.type }} {% if tag.name != null %}{{ tag.name }}{% endif %}</span> {{ tag.text | raw }}
+                        </div>
+                    {% endif %}
                     </div>
-                {% elseif tag.type == "Return" %}
-                    <div class="return">
-                        <span class="tag-name">@return</span> {{ tag.text | raw }}
-                    </div>
-                {% else %}
-                    <div class="misc-tag">
-                        <span class="tag-name">@{{ tag.type }} {% if tag.name != null %}{{ tag.name }}{% endif %}</span> {{ tag.text | raw }}
-                    </div>
-                {% endif %}
-                </div>
-            {% endfor %}
+                {% endfor %}
+            {% endif %}
         {% endfor %}
     {% endif %}
 {% endmacro %}
 
-{% macro renderType(typeDto) %}
-    {% if typeDto != null %}
-        {% if typeDto.kind == "Star" %}
-            *
-        {% elseif typeDto.kind == "Covariance" or typeDto.kind == "Contravariance" or typeDto.kind == "Invariance" %}
-            {{ renderType(typeDto.inner) }}
-        {% elseif typeDto.kind == "Nullable" or typeDto.kind == "DefinitelyNonNullable" %}
-            {{ renderType(typeDto.inner) }}{% if typeDto.kind == "Nullable" %}?{% endif %}
-        {% else %}
-            
-            {% set display = "Unknown" %}
-            {% if typeDto.presentableName != null and typeDto.presentableName != "" %}
-                {% set display = typeDto.presentableName %}
-            {% elseif typeDto.name != null and typeDto.name != "" %}
-                {% set display = typeDto.name %}
-            {% elseif typeDto.dri != null %}
-                {% set driParts = typeDto.dri | split("/") %}
-                {% if driParts | length > 1 and driParts[1] != "" %}
-                    {% set display = driParts[1] | replace({"%20": " "}) %}
-                {% endif %}
-            {% endif %}
-
-            {% if typeDto.url != null %}
-                <a href="{{ typeDto.url }}" class="type-link">{{ display }}</a>
-            {% else %}
-                <span class="type-name">{{ display }}</span>
-            {% endif %}
-            
-            {% if typeDto.projections is defined and typeDto.projections is not empty %}
-                &lt;{% for proj in typeDto.projections %}{{ renderType(proj) }}{% if not loop.last %}, {% endif %}{% endfor %}&gt;
-            {% endif %}
-
-        {% endif %}
-    {% endif %}
+ {% macro renderType(typeDto) %}
+{% if typeDto != null %}
+{% if typeDto.kind == "Star" %}*
+{% elseif typeDto.kind == "Covariance" or typeDto.kind == "Contravariance" or typeDto.kind == "Invariance" %}{{ renderType(typeDto.inner) }}
+{% elseif typeDto.kind == "Nullable" or typeDto.kind == "DefinitelyNonNullable" %}{{ renderType(typeDto.inner) }}{% if typeDto.kind == "Nullable" %}?{% endif %}
+{% elseif typeDto.kind == "TypeAliased" %}{{ renderType(typeDto.typeAlias) }}
+{% elseif typeDto.kind == "JavaObject" %}Object
+{% elseif typeDto.kind == "Void" %}Void
+{% elseif typeDto.kind == "Dynamic" %}dynamic
+{% elseif typeDto.kind == "FunctionalTypeConstructor" %}
+{% if typeDto.isSuspendable %}<span class="keyword">suspend</span> {% endif %}{% if typeDto.isExtensionFunction %}{{ renderType(typeDto.projections | first) }}.({% if typeDto.projections | length > 2 %}{% for proj in typeDto.projections | slice(1, typeDto.projections | length - 1) %}{{ renderType(proj) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}) -&gt; {{ renderType(typeDto.projections | last) }}{% else %}({% if typeDto.projections | length > 1 %}{% for proj in typeDto.projections | slice(0, typeDto.projections | length - 1) %}{{ renderType(proj) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}) -&gt; {{ renderType(typeDto.projections | last) }}{% endif %}
+{% else %}
+{% set display = "Unknown" %}
+{% if typeDto.name != null and typeDto.name != "" %}{% set display = typeDto.name %}
+{% elseif typeDto.dri != null %}{% set driParts = typeDto.dri | split("/") %}{% if driParts | length > 1 and driParts[1] != "" %}{% set display = driParts[1] | replace({"%20": " "}) %}{% endif %}{% endif %}
+{% if typeDto.presentableName != null and typeDto.presentableName != "" %}{{ typeDto.presentableName }}: {% endif %}
+{% if typeDto.url != null %}<a href="{{ typeDto.url }}" class="type-link">{{ display }}</a>{% else %}<span class="type-name">{{ display }}</span>{% endif %}{% if typeDto.projections is defined and typeDto.projections is not empty %}&lt;{% for proj in typeDto.projections %}{{ renderType(proj) }}{% if not loop.last %}, {% endif %}{% endfor %}&gt;{% endif %}
+{% endif %}
+{% endif %}
 {% endmacro %}
 
-{# Dynamically rebuilds the Kotlin signature for table summaries & the main page header #}
+
 {% macro renderTableSignature(member) %}
     <div class="table-signature">
         
-        {# 1. Annotations #}
         {% if member.extras is defined and member.extras.annotations is not empty %}
             {% for entry in member.extras.annotations %}
                 {% if loop.first %}
@@ -78,18 +64,14 @@
             {% endfor %}
         {% endif %}
 
-        {# 2. Standard Visibility / Modality #}
         {% if member.modifier is defined and member.modifier is not empty %}
             {% for entry in member.modifier %}
-                {% if loop.first %}
-                    {% if entry.value != "final" and entry.value != "public" %}
-                        <span class="keyword">{{ entry.value }}</span> 
-                    {% endif %}
+                {% if loop.first and entry.value != "final" and entry.value != "public" %}
+                    <span class="keyword">{{ entry.value }}</span> 
                 {% endif %}
             {% endfor %}
         {% endif %}
 
-        {# 3. Additional Modifiers #}
         {% if member.extras is defined and member.extras.additionalModifiers is not empty %}
             {% for entry in member.extras.additionalModifiers %}
                 {% if loop.first %}
@@ -100,34 +82,12 @@
             {% endfor %}
         {% endif %}
 
-        {# 4. Core Signature Definition #}
         {% if member.kind == "function" %}
-            <span class="keyword">fun</span> 
-            {% if member.generics is defined and member.generics is not empty %}
-                &lt;{% for gen in member.generics %}{{ gen.name }}{% if not loop.last %}, {% endif %}{% endfor %}&gt; 
-            {% endif %}
-            {% if member.receiver is defined and member.receiver is not null %}
-                {{ renderType(member.receiver.type) }}.
-            {% endif %}
-            {{ member.name }}({% if member.parameters is defined and member.parameters is not null %}{% for param in member.parameters %}{{ param.name }}: {{ renderType(param.type) }}{% if param.extras is defined and param.extras.defaultValues is not empty %} = {% for dEntry in param.extras.defaultValues %}{% if loop.first %}{{ dEntry.value | replace({"\"": "&quot;"}) }}{% endif %}{% endfor %}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}){% if member.type is defined and member.type is not null %}: {{ renderType(member.type) }}{% endif %}
-
+            <span class="keyword">fun</span> {% if member.generics is defined and member.generics is not empty %}&lt;{% for gen in member.generics %}{{ gen.name }}{% if not loop.last %}, {% endif %}{% endfor %}&gt; {% endif %}{% if member.receiver is defined and member.receiver is not null %}{{ renderType(member.receiver.type) }}.{% endif %}{{ member.name }}({% if member.parameters is defined and member.parameters is not null %}{% for param in member.parameters %}{{ param.name }}: {{ renderType(param.type) }}{% if param.extras is defined and param.extras.defaultValues is not empty %} = {% for dEntry in param.extras.defaultValues %}{% if loop.first %}{{ dEntry.value | replace({"\"": "&quot;"}) }}{% endif %}{% endfor %}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}){% if member.type is defined and member.type is not null %}: {{ renderType(member.type) }}{% endif %}
         {% elseif member.kind == "property" %}
-            <span class="keyword">val</span> 
-            {% if member.receiver is defined and member.receiver is not null %}
-                {{ renderType(member.receiver.type) }}.
-            {% endif %}
-            {{ member.name }}{% if member.type is defined and member.type is not null %}: {{ renderType(member.type) }}{% endif %}
-
+            <span class="keyword">val</span> {% if member.receiver is defined and member.receiver is not null %}{{ renderType(member.receiver.type) }}.{% endif %}{{ member.name }}{% if member.type is defined and member.type is not null %}: {{ renderType(member.type) }}{% endif %}
         {% elseif member.kind == "typeAlias" %}
-            <span class="keyword">typealias</span> {{ member.name }} = 
-            {% if member.underlyingType is defined and member.underlyingType is not null %}
-                {% for entry in member.underlyingType %}
-                    {% if loop.first %}
-                        {{ renderType(entry.value) }}
-                    {% endif %}
-                {% endfor %}
-            {% endif %}
-            
+            <span class="keyword">typealias</span> {{ member.name }} = {% if member.underlyingType is defined and member.underlyingType is not null %}{% for entry in member.underlyingType %}{% if loop.first %}{{ renderType(entry.value) }}{% endif %}{% endfor %}{% endif %}
         {% elseif member.kind == "class" or member.kind == "interface" or member.kind == "object" or member.kind == "enum" %}
             <span class="keyword">{{ member.kind }}</span> {{ member.name }}
         {% endif %}
@@ -148,7 +108,6 @@
                 </thead>
                 <tbody>
                     {% for member in members %}
-                    {# Filter out Obvious Members (equals, toString, hashCode) #}
                     {% if member.extras is not defined or not member.extras.isObviousMember %}
                     <tr>
                         <td class="col-name">
@@ -160,11 +119,13 @@
                             
                             {% if member.documentation is defined and member.documentation is not null %}
                                 {% for entry in member.documentation %}
-                                    {% for tag in entry.value %}
-                                        {% if tag.type == "Description" %}
-                                            <div class="brief">{{ tag.text | raw }}</div>
-                                        {% endif %}
-                                    {% endfor %}
+                                    {% if loop.first %}
+                                        {% for tag in entry.value %}
+                                            {% if tag.type == "Description" %}
+                                                <div class="brief">{{ tag.text | raw }}</div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
                                 {% endfor %}
                             {% endif %}
 
@@ -177,7 +138,6 @@
         </div>
     {% endif %}
 {% endmacro %}
-
 
 {# --- HTML TEMPLATE --- #}
 <!DOCTYPE html>
@@ -294,7 +254,6 @@
     <main>
         <h1><span class="keyword">{{ kind }}</span> {{ name }}</h1>
 
-        {# If this is an actual documentable, render its own signature block at the top #}
         {% if kind == "function" or kind == "property" or kind == "typeAlias" or kind == "class" or kind == "interface" or kind == "object" or kind == "enum" %}
             <div class="signature">
                 {{ renderTableSignature(_context) }}
@@ -305,39 +264,14 @@
             {{ renderDoc(documentation) }}
         </div>
 
-        {# HIGHER LEVEL NODES (Multimodule, Module, Package) #}
-        {% if modules is defined and modules is not null %}
-            {{ renderMembers("Modules", modules) }}
-        {% endif %}
-
-        {% if packages is defined and packages is not null %}
-            {{ renderMembers("Packages", packages) }}
-        {% endif %}
-
-        {# STANDARD MEMBERS #}
-        {% if classlikes is defined and classlikes is not null %}
-            {{ renderMembers("Types", classlikes) }}
-        {% endif %}
-        
-        {% if typeAliases is defined and typeAliases is not null %}
-            {{ renderMembers("Type Aliases", typeAliases) }}
-        {% endif %}
-
-        {% if constructors is defined and constructors is not null %}
-            {{ renderMembers("Constructors", constructors) }}
-        {% endif %}
-
-        {% if properties is defined and properties is not null %}
-            {{ renderMembers("Properties", properties) }}
-        {% endif %}
-
-        {% if functions is defined and functions is not null %}
-            {{ renderMembers("Functions", functions) }}
-        {% endif %}
-
-        {% if entries is defined and entries is not null %}
-            {{ renderMembers("Enum Entries", entries) }}
-        {% endif %}
+        {% if modules is defined and modules is not null %}{{ renderMembers("Modules", modules) }}{% endif %}
+        {% if packages is defined and packages is not null %}{{ renderMembers("Packages", packages) }}{% endif %}
+        {% if classlikes is defined and classlikes is not null %}{{ renderMembers("Types", classlikes) }}{% endif %}
+        {% if typeAliases is defined and typeAliases is not null %}{{ renderMembers("Type Aliases", typeAliases) }}{% endif %}
+        {% if constructors is defined and constructors is not null %}{{ renderMembers("Constructors", constructors) }}{% endif %}
+        {% if properties is defined and properties is not null %}{{ renderMembers("Properties", properties) }}{% endif %}
+        {% if functions is defined and functions is not null %}{{ renderMembers("Functions", functions) }}{% endif %}
+        {% if entries is defined and entries is not null %}{{ renderMembers("Enum Entries", entries) }}{% endif %}
 
     </main>
 </body>

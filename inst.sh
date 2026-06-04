@@ -1,29 +1,24 @@
 #!/bin/bash
 
-IN_DIR="/Users/alex/ADFA/Misc Software/Pebble Templating/kmath/build/dokka/html"             
-OUT_DIR="./build/rendered-docs"         
-TEMPLATES_DIR="./templates"
-JAVA_TOOL_CLASSPATH="/Users/alex/ADFA/Misc Software/Pebble Templating/kdoc-pebble-processing/pebble-template-cli/build/libs/PebbleTemplate.jar:."
-LAYOUT_TEMPLATE="$TEMPLATES_DIR/layout.pebble"
+# ==========================================
+# Configuration Paths (Adjust as needed)
+# ==========================================
+INPUT_DIR="/Users/alex/ADFA/Misc Software/Pebble Templating/kmath/build/dokka/html"
+OUTPUT_DIR="./build/real-extra"
+TEMPLATE_FILE="./templates/layout.pebble"
+PEBBLE_JAR="pebble-template-cli/build/libs/PebbleTemplate.jar"
+LOG_FILE="./build/pebble-debug.log"
 
-mkdir -p "$OUT_DIR"
+PEBBLE_JAR="pebble-template-cli/build/libs/PebbleTemplate.jar"
+# Ensure the base output directory and log directory exist
+mkdir -p "$OUTPUT_DIR"
+mkdir -p "$(dirname "$LOG_FILE")"
 
-# 1. Look for the newly generated .json files
-find "$IN_DIR" -type f -name "*.json" | while read -r filepath; do
-    
-    page_type=$(jq -r '.pageType' "$filepath")
-    if [ "$page_type" == "null" ] || [ -z "$page_type" ]; then
-        continue
-    fi
-    
-    rel_path="${filepath#$IN_DIR/}"
-    
-    # 2. Swap the extension back to .html for the final templated output
-    target_file="$OUT_DIR/${rel_path%.json}.html"
-    target_dir=$(dirname "$target_file")
-    mkdir -p "$target_dir"
+echo "🚀 Booting JVM for parallel Pebble HTML compilation..."
 
-    echo "Rendering [$page_type] -> $target_file"
-    
-    java -cp "$JAVA_TOOL_CLASSPATH" JsonMain --data "$filepath" --template "$LAYOUT_TEMPLATE" --output "$target_file"
-done
+# Execute the Java program once, passing the entire directory and log file
+java -jar "$PEBBLE_JAR" \
+    --inputDir "$INPUT_DIR" \
+    --template "$TEMPLATE_FILE" \
+    --outputDir "$OUTPUT_DIR" \
+    --logFile "$LOG_FILE"

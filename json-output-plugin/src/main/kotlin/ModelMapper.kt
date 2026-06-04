@@ -14,18 +14,30 @@ class ModelMapper(
     private val logger: PluginLogger,
     private val replaceHtmlExtension: Boolean
 ) {
+    private fun resolveUrl(dri: DRI?, sourceSets: Set<DisplaySourceSet>): String? {
+        if (dri == null) return null
+        
+        var url = locationProvider.resolve(dri, sourceSets, contextNode)
+        if (url == null) {
+            url = locationProvider.resolve(dri, emptySet(), contextNode)
+        }
+        
+        // --- UNIVERSAL CROSS-MODULE FALLBACK ---
+        if (url == null) {
+            url = "unresolved:${dri}"
+        }
+
+        if (replaceHtmlExtension && !url.startsWith("http") && !url.startsWith("unresolved:")) {
+            url = url.replace(".html", ".json")
+        }
+        return url
+    }
 
     fun mapToDto(doc: Documentable): DocumentableDto? {
         logger.debug("Mapping documentable ${doc.name} of type ${doc::class.java.simpleName}")
         
         val displaySourceSets = doc.sourceSets.map { it.toDisplaySourceSet() }.toSet()
-        var url = locationProvider.resolve(doc.dri, displaySourceSets, contextNode)
-        
-        if (replaceHtmlExtension && url != null && !url.startsWith("http")) {
-            url = url.replace(".html", ".json")
-        }
-        
-        logger.debug("Resolved URL: $url")
+        val url = resolveUrl(doc.dri, displaySourceSets)
 
         return when (doc) {
             is DModule -> ModuleDto(
@@ -269,22 +281,11 @@ class ModelMapper(
     }
 
     private fun mapBound(bound: Bound, sourceSets: Set<DisplaySourceSet>): BoundDto {
-        
-        fun resolveUrl(dri: DRI?): String? {
-            if (dri == null) return null
-            var url = locationProvider.resolve(dri, sourceSets, contextNode)
-            if (replaceHtmlExtension && url != null && !url.startsWith("http")) {
-                url = url.replace(".html", ".json")
-            }
-            if (url != null) logger.debug("Resolved TYPE URL for $dri: $url")
-            return url
-        }
-
         return when (bound) {
-            is TypeParameter -> TypeParameterBoundDto(bound.dri.toString(), bound.name, bound.presentableName, resolveUrl(bound.dri))
-            is Nullable -> NullableDto(mapBound(bound.inner, sourceSets), resolveUrl(null))
+            is TypeParameter -> TypeParameterBoundDto(bound.dri.toString(), bound.name, bound.presentableName, resolveUrl(bound.dri, sourceSets))
+            is Nullable -> NullableDto(mapBound(bound.inner, sourceSets), resolveUrl(null, sourceSets))
             is DefinitelyNonNullable -> DefinitelyNonNullableDto(mapBound(bound.inner, sourceSets))
-            is TypeAliased -> TypeAliasedDto(mapBound(bound.typeAlias, sourceSets), mapBound(bound.inner, sourceSets), resolveUrl(null))
+            is TypeAliased -> TypeAliasedDto(mapBound(bound.typeAlias, sourceSets), mapBound(bound.inner, sourceSets), resolveUrl(null, sourceSets))
             is PrimitiveJavaType -> PrimitiveJavaTypeDto(bound.name)
             is JavaObject -> JavaObjectDto()
             is Void -> VoidDto()
@@ -294,7 +295,7 @@ class ModelMapper(
                 dri = bound.dri.toString(), 
                 projections = bound.projections.map { mapProjection(it, sourceSets) }, 
                 presentableName = bound.presentableName,
-                url = resolveUrl(bound.dri)
+                url = resolveUrl(bound.dri, sourceSets)
             )
             is FunctionalTypeConstructor -> FunctionalTypeConstructorDto(
                 dri = bound.dri.toString(), 
@@ -302,17 +303,18 @@ class ModelMapper(
                 isExtensionFunction = bound.isExtensionFunction, 
                 isSuspendable = bound.isSuspendable, 
                 presentableName = bound.presentableName,
-                url = resolveUrl(bound.dri)
+                url = resolveUrl(bound.dri, sourceSets)
             )
         }
     }
 
     private fun mapDocNodes(docs: SourceSetDependent<DocumentationNode>): Map<String, List<TagWrapperDto>> {
         return docs.entries.associate { (sourceSet, node) ->
+            val displaySourceSets = setOf(sourceSet.toDisplaySourceSet())
             val tags = node.children.map { tagWrapper ->
                 TagWrapperDto(
                     type = tagWrapper::class.java.simpleName,
-                    text = extractText(tagWrapper.root).trim(),
+                    text = extractText(tagWrapper.root, displaySourceSets).trim(),
                     name = if (tagWrapper is NamedTagWrapper) tagWrapper.name else null
                 )
             }
@@ -320,25 +322,52 @@ class ModelMapper(
         }
     }
 
-    private fun extractText(tag: DocTag): String {
+private fun extractText(tag: DocTag, sourceSets: Set<DisplaySourceSet>): String {
         return when (tag) {
-            is Text -> tag.body
-            is CodeInline -> "`" + tag.children.joinToString("") { extractText(it) } + "`"
-            is CodeBlock -> "```\n" + tag.children.joinToString("") { extractText(it) } + "\n```"
-            is P -> tag.children.joinToString("") { extractText(it) } + "\n\n"
-            is Br -> "\n"
+            // Base text: Escape HTML brackets so things like List<String> render correctly
+            is Text -> tag.body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            
+            // Layout
+            is P -> "<p>${tag.children.joinToString("") { extractText(it, sourceSets) }}</p>"
+            is Br -> "<br/>"
+            is BlockQuote -> "<blockquote>${tag.children.joinToString("") { extractText(it, sourceSets) }}</blockquote>"
+            
+            // Formatting
+            is B -> "<b>${tag.children.joinToString("") { extractText(it, sourceSets) }}</b>"
+            is Strong -> "<strong>${tag.children.joinToString("") { extractText(it, sourceSets) }}</strong>"
+            is I -> "<i>${tag.children.joinToString("") { extractText(it, sourceSets) }}</i>"
+            is Em -> "<em>${tag.children.joinToString("") { extractText(it, sourceSets) }}</em>"
+            
+            // Code
+            is CodeInline -> "<code>${tag.children.joinToString("") { extractText(it, sourceSets) }}</code>"
+            is CodeBlock -> "<pre><code>${tag.children.joinToString("") { extractText(it, sourceSets) }}</code></pre>"
+            
+            // Lists
+            is Ul -> "<ul>${tag.children.joinToString("") { extractText(it, sourceSets) }}</ul>"
+            is Ol -> "<ol>${tag.children.joinToString("") { extractText(it, sourceSets) }}</ol>"
+            is Li -> "<li>${tag.children.joinToString("") { extractText(it, sourceSets) }}</li>"
+            
+            // Headers
+            is H1 -> "<h1>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h1>"
+            is H2 -> "<h2>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h2>"
+            is H3 -> "<h3>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h3>"
+            is H4 -> "<h4>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h4>"
+            is H5 -> "<h5>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h5>"
+            is H6 -> "<h6>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h6>"
+            
+            // Links
             is A -> {
                 val href = tag.params["href"] ?: ""
-                "[" + tag.children.joinToString("") { extractText(it) } + "]($href)"
+                "<a href=\"$href\">${tag.children.joinToString("") { extractText(it, sourceSets) }}</a>"
             }
-            is CustomDocTag -> {
-                logger.debug("Encountered CustomDocTag: name=${tag.name}")
-                tag.children.joinToString("") { extractText(it) }
+            is DocumentationLink -> {
+                val href = resolveUrl(tag.dri, sourceSets)
+                "<a href=\"$href\" data-dri=\"${tag.dri}\">${tag.children.joinToString("") { extractText(it, sourceSets) }}</a>"
             }
-            else -> {
-                logger.warn("Unhandled DocTag type: ${tag::class.java.simpleName}. Falling back to raw children.")
-                tag.children.joinToString("") { extractText(it) }
-            }
+            
+            // Fallback for unknown/custom tags
+            is CustomDocTag -> tag.children.joinToString("") { extractText(it, sourceSets) }
+            else -> tag.children.joinToString("") { extractText(it, sourceSets) }
         }
     }
 

@@ -1,8 +1,5 @@
 plugins {
     java
-    application
-    // The new, actively maintained GradleUp Shadow plugin
-    id("com.gradleup.shadow") version "8.3.0"
 }
 
 repositories {
@@ -17,11 +14,6 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.15.3")
 }
 
-// Tell Gradle where to find your main method
-application {
-    mainClass.set("JsonMain")
-}
-
 // Use Java 17
 java {
     toolchain {
@@ -29,8 +21,17 @@ java {
     }
 }
 
-// Configure the Shadow plugin to output the exact filename you asked for.
-// By casting it as a standard <Jar> task, we avoid legacy package-name imports.
-tasks.named<Jar>("shadowJar") {
+// Intercept the default "jar" task to bundle dependencies natively
+tasks.named<Jar>("jar") {
     archiveFileName.set("PebbleTemplate.jar")
+    
+    manifest {
+        attributes(mapOf("Main-Class" to "JsonMain"))
+    }
+
+    // Extract and bundle all dependencies into the final JAR
+    from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+    
+    // Prevent duplicate file errors (e.g., overlapping META-INF/MANIFEST.MF files)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

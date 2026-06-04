@@ -117,6 +117,7 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         }
 
         traverse(root)
+        LinkPostProcessor.postProcess(context)
         logger.info("JSON rendering completed.")
     }
 
