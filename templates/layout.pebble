@@ -247,7 +247,18 @@
 <body>
     <header>
         <div class="breadcrumb">
-            API Documentation / {{ name }}
+            {% if breadcrumbs is defined and breadcrumbs is not empty %}
+                {% for crumb in breadcrumbs %}
+                    {% if crumb.url != null and not loop.last %}
+                        <a href="{{ crumb.url }}">{{ crumb.name }}</a>
+                    {% else %}
+                        {{ crumb.name }}
+                    {% endif %}
+                    {% if not loop.last %} / {% endif %}
+                {% endfor %}
+            {% else %}
+                API Documentation / {{ name }}
+            {% endif %}
         </div>
     </header>
     

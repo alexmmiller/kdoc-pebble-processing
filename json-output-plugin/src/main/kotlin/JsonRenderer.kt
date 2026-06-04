@@ -1,7 +1,8 @@
 package my.dokka.plugin
 
-import kotlinx.serialization.decodeFromString // <--- ADD THIS
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.*
+import my.dokka.plugin.dtos.BreadcrumbNode // <-- NEW
 import my.dokka.plugin.dtos.DocumentableDto
 import my.dokka.plugin.dtos.ModuleReferenceDto
 import my.dokka.plugin.dtos.MultimoduleRootDto
@@ -22,7 +23,7 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         prettyPrint = true 
         classDiscriminator = "kind" 
         encodeDefaults = true
-        ignoreUnknownKeys = true // <--- Prevents crashes on unknown JSON fields
+        ignoreUnknownKeys = true 
     }
 
     override fun render(root: RootPageNode) {
@@ -30,7 +31,6 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         var config = configuration<JsonOutputPlugin, JsonPluginConfig>(context)
 
         // MANUAL FALLBACK PARSING
-        // If Dokka's internal parser fails to map the config, intercept the raw JSON and parse it ourselves
         if (config == null) {
             val rawConfig = context.configuration.pluginsConfiguration.find { it.fqPluginName == fqcn }?.values
             if (rawConfig != null) {
@@ -41,9 +41,7 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
                     context.logger.error("Manual config parsing failed: ${e.message}")
                 }
             } else {
-                // If it reaches here, Gradle is failing to pass the pluginsMapConfiguration to the task entirely
                 context.logger.warn("No JSON config found in pluginsConfiguration for $fqcn! Falling back to defaults.")
-                context.logger.warn("Available configs were: ${context.configuration.pluginsConfiguration.map { it.fqPluginName }}")
             }
         }
 
@@ -63,7 +61,6 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         if (context.configuration.modules.isNotEmpty()) {
             logger.info("Multimodule project detected. Generating root index.json...")
             
-            // Respects the deserialized configuration flag
             val ext = if (finalConfig.replaceHtmlExtension) "json" else "html"
             val rootDto = MultimoduleRootDto(
                 name = root.name,
@@ -85,13 +82,26 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
             logger.debug("Wrote Multimodule Root JSON to: ${outputFile.name}")
         }
 
-        // --- STANDARD TRAVERSAL ---
-        fun traverse(node: PageNode) {
+        // --- STANDARD TRAVERSAL WITH ANCESTRY TRACKING ---
+        fun traverse(node: PageNode, ancestors: List<PageNode>) {
+            // Push the current page onto the navigation stack
+            val currentPath = ancestors + node
+            
             if (node is WithDocumentables && node.documentables.isNotEmpty()) {
                 val documentable = node.documentables.first()
                 logger.debug("Processing documentable: ${documentable.name} (${documentable.dri})")
                 
-                // Pass the extracted config down into ModelMapper
+                // --- NEW: Generate Breadcrumbs ---
+                val breadcrumbs = currentPath.map { ancestor ->
+                    // Resolve the relative URL from the CURRENT node to this ANCESTOR
+                    var url = locationProvider.resolve(ancestor, context = node, skipExtension = false)
+                    
+                    if (url != null && finalConfig.replaceHtmlExtension && !url.startsWith("http")) {
+                        url = url.replace(".html", ".json")
+                    }
+                    BreadcrumbNode(name = ancestor.name, url = url)
+                }
+                
                 val mapper = ModelMapper(
                     locationProvider = locationProvider, 
                     contextNode = node, 
@@ -99,7 +109,8 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
                     replaceHtmlExtension = finalConfig.replaceHtmlExtension
                 )
                 
-                val dto = mapper.mapToDto(documentable)
+                // Pass the breadcrumbs array down into the DTO builder!
+                val dto = mapper.mapToDto(documentable, breadcrumbs)
                 
                 if (dto != null) {
                     val pagePath = locationProvider.resolve(node, context = null, skipExtension = true)
@@ -113,10 +124,14 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
                     logger.debug("Wrote JSON to: ${outputFile.name}")
                 }
             }
-            node.children.forEach { traverse(it) }
+            
+            // Pass the path down to the children
+            node.children.forEach { traverse(it, currentPath) }
         }
 
-        traverse(root)
+        // Kick off the traversal with an empty path history
+        traverse(root, emptyList())
+        
         LinkPostProcessor.postProcess(context)
         logger.info("JSON rendering completed.")
     }

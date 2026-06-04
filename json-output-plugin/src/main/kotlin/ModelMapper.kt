@@ -33,7 +33,8 @@ class ModelMapper(
         return url
     }
 
-    fun mapToDto(doc: Documentable): DocumentableDto? {
+    // <-- NEW: Added breadcrumbs parameter to mapping function
+    fun mapToDto(doc: Documentable, breadcrumbs: List<BreadcrumbNode> = emptyList()): DocumentableDto? {
         logger.debug("Mapping documentable ${doc.name} of type ${doc::class.java.simpleName}")
         
         val displaySourceSets = doc.sourceSets.map { it.toDisplaySourceSet() }.toSet()
@@ -46,6 +47,7 @@ class ModelMapper(
                 sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(),
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 packages = doc.packages.mapNotNull { mapToDto(it) }
             )
             is DPackage -> PackageDto(
@@ -53,6 +55,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 functions = doc.functions.mapNotNull { mapToDto(it) },
                 properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
@@ -63,6 +66,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 constructors = doc.constructors.mapNotNull { mapToDto(it) },
                 functions = doc.functions.mapNotNull { mapToDto(it) },
                 properties = doc.properties.mapNotNull { mapToDto(it) },
@@ -83,6 +87,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 entries = doc.entries.mapNotNull { mapToDto(it) },
                 constructors = doc.constructors.mapNotNull { mapToDto(it) },
                 functions = doc.functions.mapNotNull { mapToDto(it) },
@@ -102,6 +107,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 functions = doc.functions.mapNotNull { mapToDto(it) },
                 properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) }
@@ -111,6 +117,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 isConstructor = doc.isConstructor,
                 parameters = doc.parameters.mapNotNull { mapToDto(it) as? ParameterDto },
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
@@ -127,6 +134,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 functions = doc.functions.mapNotNull { mapToDto(it) },
                 properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
@@ -146,6 +154,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 functions = doc.functions.mapNotNull { mapToDto(it) },
                 properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
@@ -162,6 +171,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 functions = doc.functions.mapNotNull { mapToDto(it) },
                 properties = doc.properties.mapNotNull { mapToDto(it) },
                 classlikes = doc.classlikes.mapNotNull { mapToDto(it) },
@@ -177,6 +187,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 sources = mapSourceSetDependent(doc.sources) { _, it -> it.path },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },
                 type = mapBound(doc.type, displaySourceSets),
@@ -193,6 +204,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 type = mapBound(doc.type, displaySourceSets)
             )
             is DTypeParameter -> TypeParameterDto(
@@ -200,6 +212,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 bounds = doc.bounds.map { mapBound(it, displaySourceSets) },
                 variantTypeParameter = mapProjection(doc.variantTypeParameter, displaySourceSets) as VarianceDto
             )
@@ -208,6 +221,7 @@ class ModelMapper(
                 documentation = mapDocNodes(doc.documentation), sourceSets = mapSourceSets(doc.sourceSets),
                 expectPresentInSet = doc.expectPresentInSet?.sourceSetID?.toString(), 
                 extras = mapExtras(doc.extra),
+                breadcrumbs = breadcrumbs,
                 type = mapBound(doc.type, displaySourceSets),
                 underlyingType = mapSourceSetDependent(doc.underlyingType) { ss, it -> mapBound(it, setOf(ss.toDisplaySourceSet())) },
                 visibility = mapSourceSetDependent(doc.visibility) { _, it -> it.name },

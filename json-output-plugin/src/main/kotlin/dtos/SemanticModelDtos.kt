@@ -108,6 +108,7 @@ sealed class DocumentableDto {
     abstract val sourceSets: List<String>
     abstract val expectPresentInSet: String?
     abstract val extras: ExtrasDto
+    abstract val breadcrumbs: List<BreadcrumbNode> // <-- NEW: Added to base class
 }
 
 @Serializable
@@ -120,6 +121,7 @@ data class ModuleDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val packages: List<DocumentableDto>
 ) : DocumentableDto()
 
@@ -133,6 +135,7 @@ data class PackageDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val functions: List<DocumentableDto>,
     val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
@@ -149,6 +152,7 @@ data class ClassDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val constructors: List<DocumentableDto>,
     val functions: List<DocumentableDto>,
     val properties: List<DocumentableDto>,
@@ -173,6 +177,7 @@ data class EnumDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val entries: List<DocumentableDto>,
     val constructors: List<DocumentableDto>,
     val functions: List<DocumentableDto>,
@@ -196,6 +201,7 @@ data class EnumEntryDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val functions: List<DocumentableDto>,
     val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>
@@ -211,6 +217,7 @@ data class FunctionDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val isConstructor: Boolean,
     val parameters: List<ParameterDto>,
     val sources: Map<String, String>,
@@ -233,6 +240,7 @@ data class InterfaceDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val functions: List<DocumentableDto>,
     val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
@@ -256,6 +264,7 @@ data class ObjectDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val functions: List<DocumentableDto>,
     val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
@@ -276,6 +285,7 @@ data class AnnotationDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val functions: List<DocumentableDto>,
     val properties: List<DocumentableDto>,
     val classlikes: List<DocumentableDto>,
@@ -297,6 +307,7 @@ data class PropertyDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val sources: Map<String, String>,
     val visibility: Map<String, String>,
     val type: BoundDto,
@@ -319,6 +330,7 @@ data class ParameterDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val type: BoundDto
 ) : DocumentableDto()
 
@@ -332,6 +344,7 @@ data class TypeParameterDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val bounds: List<BoundDto>,
     val variantTypeParameter: VarianceDto
 ) : DocumentableDto()
@@ -346,6 +359,7 @@ data class TypeAliasDto(
     override val sourceSets: List<String>,
     override val expectPresentInSet: String?,
     override val extras: ExtrasDto,
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val type: BoundDto,
     val underlyingType: Map<String, BoundDto>,
     val visibility: Map<String, String>,
@@ -371,5 +385,13 @@ data class MultimoduleRootDto(
     override val sourceSets: List<String> = emptyList(),
     override val expectPresentInSet: String? = null,
     override val extras: ExtrasDto = ExtrasDto(),
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
     val modules: List<ModuleReferenceDto>
 ) : DocumentableDto()
+
+// --- NEW: Breadcrumb Node ---
+@Serializable
+data class BreadcrumbNode(
+    val name: String,
+    val url: String?
+)
