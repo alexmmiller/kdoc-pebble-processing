@@ -1,5 +1,16 @@
 {# --- MACROS --- #}
 
+{% macro renderPlatforms(sourceSets) %}
+    {% if sourceSets is defined and sourceSets is not null and sourceSets is not empty %}
+        <div class="platforms">
+        {% for sourceSet in sourceSets %}
+            {% set parts = sourceSet | split("/") %}
+            <span class="platform-tag">{{ parts | last }}</span>
+        {% endfor %}
+        </div>
+    {% endif %}
+{% endmacro %}
+
 {% macro renderDoc(docMap) %}
     {% if docMap != null %}
         {% for entry in docMap %}
@@ -16,6 +27,8 @@
                         <div class="return">
                             <span class="tag-name">@return</span> {{ tag.text | raw }}
                         </div>
+                    {% elseif tag.type == "CustomTagWrapper" and tag.name == "Since Kotlin" %}
+                        <span class="kdoc-tag"><h4 class="">Since Kotlin</h4>{{ tag.text | raw }}</span>
                     {% else %}
                         <div class="misc-tag">
                             <span class="tag-name">@{{ tag.type }} {% if tag.name != null %}{{ tag.name }}{% endif %}</span> {{ tag.text | raw }}
@@ -58,11 +71,20 @@
                 {% if loop.first %}
                     {% for anno in entry.value %}
                         {% set annoName = anno.dri | split("/") %}
-                        <div class="annotation">@{{ annoName[1] }}</div>
+                        <div class="annotation">
+                            {# --- UPDATED TO RENDER THE LINK --- #}
+                            {% if anno.url != null %}
+                                <a href="{{ anno.url }}" style="color: inherit; text-decoration: none;">@{{ annoName[1] }}</a>
+                            {% else %}
+                                @{{ annoName[1] }}
+                            {% endif %}
+                        </div>
                     {% endfor %}
                 {% endif %}
             {% endfor %}
         {% endif %}
+
+        {# ... (rest of the renderTableSignature macro remains unchanged) ... #}
 
         {% if member.modifier is defined and member.modifier is not empty %}
             {% for entry in member.modifier %}
@@ -112,6 +134,7 @@
                     <tr>
                         <td class="col-name">
                             <a href="{{ member.url | default('#') }}">{{ member.name | default('Unknown') }}</a>
+                            {{ renderPlatforms(member.sourceSets) }}
                         </td>
                         <td class="col-summary">
                             
@@ -230,6 +253,34 @@
         .tag-name { font-weight: 600; color: #555; margin-right: 0.5rem; }
         .brief { color: #444; margin-top: 0.2rem; }
         
+        /* Added Platform Styles */
+        .platforms { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 0.3rem; 
+            margin-top: 0.4rem; 
+            margin-bottom: 0.5rem;
+        }
+        .platform-tag {
+            display: inline-block;
+            background-color: var(--bg-alt);
+            color: #555;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.1rem 0.4rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            text-transform: capitalize;
+        }
+
+        /* Added CustomTagWrapper 'Since Kotlin' Styles */
+        .kdoc-tag h4 {
+            font-size: 1rem;
+            margin: 0.8rem 0 0.2rem 0;
+            color: #555;
+            font-weight: 600;
+        }
+
         code {
             background-color: rgba(0,0,0,0.05);
             padding: 0.2rem 0.4rem;
@@ -264,6 +315,7 @@
     
     <main>
         <h1><span class="keyword">{{ kind }}</span> {{ name }}</h1>
+        {{ renderPlatforms(sourceSets) }}
 
         {% if kind == "function" or kind == "property" or kind == "typeAlias" or kind == "class" or kind == "interface" or kind == "object" or kind == "enum" %}
             <div class="signature">

@@ -14,10 +14,12 @@ data class TagWrapperDto(
 
 // --- Extras & Properties ---
 
+
 @Serializable
 data class AnnotationWrapperDto(
     val dri: String,
-    val params: Map<String, String>
+    val params: Map<String, String>,
+    val url: String? = null // <--- ADD THIS
 )
 
 @Serializable

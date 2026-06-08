@@ -7,6 +7,12 @@ import org.jetbrains.dokka.model.*
 import org.jetbrains.dokka.model.doc.*
 import org.jetbrains.dokka.model.properties.PropertyContainer
 import org.jetbrains.dokka.pages.PageNode
+// --- NEW IMPORTS REQUIRED FOR SAMPLE EXTRACTION ---
+import org.jetbrains.dokka.pages.ContentPage
+import org.jetbrains.dokka.pages.ContentNode
+import org.jetbrains.dokka.pages.ContentCodeBlock
+import org.jetbrains.dokka.pages.ContentText
+import org.jetbrains.dokka.pages.ContentBreakLine
 
 class ModelMapper(
     private val locationProvider: LocationProvider,
@@ -22,7 +28,6 @@ class ModelMapper(
             url = locationProvider.resolve(dri, emptySet(), contextNode)
         }
         
-        // --- UNIVERSAL CROSS-MODULE FALLBACK ---
         if (url == null) {
             url = "unresolved:${dri}"
         }
@@ -33,7 +38,6 @@ class ModelMapper(
         return url
     }
 
-    // <-- NEW: Added breadcrumbs parameter to mapping function
     fun mapToDto(doc: Documentable, breadcrumbs: List<BreadcrumbNode> = emptyList()): DocumentableDto? {
         logger.debug("Mapping documentable ${doc.name} of type ${doc::class.java.simpleName}")
         
@@ -232,7 +236,7 @@ class ModelMapper(
         }
     }
 
-    private fun mapExtras(extra: PropertyContainer<*>): ExtrasDto {
+private fun mapExtras(extra: PropertyContainer<*>): ExtrasDto {
         val isObviousMember = extra.allOfType<Any>().any { it::class.java.simpleName == "ObviousMember" }
         val isException = extra.allOfType<Any>().any { it::class.java.simpleName == "ExceptionInSupertypes" }
 
@@ -240,11 +244,14 @@ class ModelMapper(
             ss.sourceSetID.toString() to list.map { anno ->
                 AnnotationWrapperDto(
                     dri = anno.dri.toString(),
-                    params = anno.params.entries.associate { (k, v) -> k to v.toString() }
+                    params = anno.params.entries.associate { (k, v) -> k to v.toString() },
+                    // --- ADD THIS LINE TO RESOLVE THE URL ---
+                    url = resolveUrl(anno.dri, setOf(ss.toDisplaySourceSet()))
                 )
             }
         } ?: emptyMap()
-
+        
+        // ... (rest of the mapExtras function remains unchanged)
         val defaultValuesMap = mutableMapOf<String, String>()
         extra.allOfType<Any>().firstOrNull { it::class.java.simpleName == "DefaultValue" }?.let { defValue ->
             try {
@@ -322,13 +329,48 @@ class ModelMapper(
         }
     }
 
+    // --- UPDATED: Extracts Sample Text directly from the resolved PageNode ---
     private fun mapDocNodes(docs: SourceSetDependent<DocumentationNode>): Map<String, List<TagWrapperDto>> {
         return docs.entries.associate { (sourceSet, node) ->
-            val displaySourceSets = setOf(sourceSet.toDisplaySourceSet())
+            val displaySourceSet = sourceSet.toDisplaySourceSet()
+            val displaySourceSets = setOf(displaySourceSet)
+            
+            // Collect all resolved sample code blocks for this platform
+            val pageSamples = mutableListOf<String>()
+            if (contextNode is ContentPage) {
+                fun walk(n: ContentNode) {
+                    if (n is ContentCodeBlock && 
+                        n.style.any { it.toString().contains("RunnableSample", ignoreCase = true) } &&
+                        n.sourceSets.contains(displaySourceSet)
+                    ) {
+                        fun extractContentText(cn: ContentNode): String {
+                            if (cn is ContentText) return cn.text
+                            if (cn is ContentBreakLine) return "\n"
+                            return cn.children.joinToString("") { extractContentText(it) }
+                        }
+                        pageSamples.add(extractContentText(n))
+                    }
+                    n.children.forEach { walk(it) }
+                }
+                walk(contextNode.content)
+            }
+            
+            var sampleIndex = 0
             val tags = node.children.map { tagWrapper ->
+                val type = tagWrapper::class.java.simpleName
+                var text = extractText(tagWrapper.root, displaySourceSets).trim()
+                
+                // Inject the missing sample text
+                if (type == "Sample" && text.isEmpty()) {
+                    if (sampleIndex < pageSamples.size) {
+                        text = pageSamples[sampleIndex]
+                        sampleIndex++
+                    }
+                }
+                
                 TagWrapperDto(
-                    type = tagWrapper::class.java.simpleName,
-                    text = extractText(tagWrapper.root, displaySourceSets).trim(),
+                    type = type,
+                    text = text,
                     name = if (tagWrapper is NamedTagWrapper) tagWrapper.name else null
                 )
             }
@@ -336,32 +378,26 @@ class ModelMapper(
         }
     }
 
-private fun extractText(tag: DocTag, sourceSets: Set<DisplaySourceSet>): String {
+    private fun extractText(tag: DocTag, sourceSets: Set<DisplaySourceSet>): String {
         return when (tag) {
-            // Base text: Escape HTML brackets so things like List<String> render correctly
             is Text -> tag.body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             
-            // Layout
             is P -> "<p>${tag.children.joinToString("") { extractText(it, sourceSets) }}</p>"
             is Br -> "<br/>"
             is BlockQuote -> "<blockquote>${tag.children.joinToString("") { extractText(it, sourceSets) }}</blockquote>"
             
-            // Formatting
             is B -> "<b>${tag.children.joinToString("") { extractText(it, sourceSets) }}</b>"
             is Strong -> "<strong>${tag.children.joinToString("") { extractText(it, sourceSets) }}</strong>"
             is I -> "<i>${tag.children.joinToString("") { extractText(it, sourceSets) }}</i>"
             is Em -> "<em>${tag.children.joinToString("") { extractText(it, sourceSets) }}</em>"
             
-            // Code
             is CodeInline -> "<code>${tag.children.joinToString("") { extractText(it, sourceSets) }}</code>"
             is CodeBlock -> "<pre><code>${tag.children.joinToString("") { extractText(it, sourceSets) }}</code></pre>"
             
-            // Lists
             is Ul -> "<ul>${tag.children.joinToString("") { extractText(it, sourceSets) }}</ul>"
             is Ol -> "<ol>${tag.children.joinToString("") { extractText(it, sourceSets) }}</ol>"
             is Li -> "<li>${tag.children.joinToString("") { extractText(it, sourceSets) }}</li>"
             
-            // Headers
             is H1 -> "<h1>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h1>"
             is H2 -> "<h2>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h2>"
             is H3 -> "<h3>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h3>"
@@ -369,7 +405,6 @@ private fun extractText(tag: DocTag, sourceSets: Set<DisplaySourceSet>): String 
             is H5 -> "<h5>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h5>"
             is H6 -> "<h6>${tag.children.joinToString("") { extractText(it, sourceSets) }}</h6>"
             
-            // Links
             is A -> {
                 val href = tag.params["href"] ?: ""
                 "<a href=\"$href\">${tag.children.joinToString("") { extractText(it, sourceSets) }}</a>"
@@ -379,7 +414,6 @@ private fun extractText(tag: DocTag, sourceSets: Set<DisplaySourceSet>): String 
                 "<a href=\"$href\" data-dri=\"${tag.dri}\">${tag.children.joinToString("") { extractText(it, sourceSets) }}</a>"
             }
             
-            // Fallback for unknown/custom tags
             is CustomDocTag -> tag.children.joinToString("") { extractText(it, sourceSets) }
             else -> tag.children.joinToString("") { extractText(it, sourceSets) }
         }
