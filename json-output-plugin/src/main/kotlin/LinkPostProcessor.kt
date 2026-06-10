@@ -26,14 +26,12 @@ object LinkPostProcessor {
         context.logger.info("Indexed ${driIndex.size} DRIs across ${jsonFiles.size} JSON files.")
         
         // --- PASS 2: Resolve Links ---
-        // Matches unresolved:[DRI] without requiring surrounding quotes, allowing it to work inside Markdown strings!
         val unresolvedRegex = """unresolved:([^\s")\\]+)""".toRegex()
         var replacedCount = 0
         
         for (file in jsonFiles) {
             val text = file.readText()
             if (text.contains("unresolved:")) {
-                // Calculate dynamic "go up" prefix (e.g., "../../") to get to the root of the docs
                 val relativeParent = file.parentFile.toRelativeString(dir).replace("\\", "/")
                 val depth = if (relativeParent.isEmpty()) 0 else relativeParent.split("/").filter { it.isNotEmpty() }.size
                 val rootPrefix = if (depth == 0) "./" else "../".repeat(depth)
@@ -46,7 +44,7 @@ object LinkPostProcessor {
                         replacedCount++
                         "$rootPrefix$resolved"
                     } else {
-                        "#" // Safely fallback to a dead link if the module truly isn't documented
+                        "#"
                     }
                 }
                 file.writeText(replaced)
@@ -60,7 +58,6 @@ object LinkPostProcessor {
             val dri = (element["dri"] as? JsonPrimitive)?.contentOrNull
             val url = (element["url"] as? JsonPrimitive)?.contentOrNull
             
-            // Only index actual local files, skip http and unresolved flags
             if (dri != null && url != null && !url.startsWith("unresolved:") && !url.startsWith("http") && !url.startsWith("#")) {
                 val cleanParent = relativePath.trim('/')
                 val fullUrl = if (cleanParent.isEmpty()) url else "$cleanParent/$url"

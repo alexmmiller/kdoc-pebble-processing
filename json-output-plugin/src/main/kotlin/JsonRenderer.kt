@@ -2,11 +2,9 @@ package my.dokka.plugin
 
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.*
-import my.dokka.plugin.dtos.BreadcrumbNode // <-- NEW
-import my.dokka.plugin.dtos.DocumentableDto
-import my.dokka.plugin.dtos.ModuleReferenceDto
-import my.dokka.plugin.dtos.MultimoduleRootDto
+import my.dokka.plugin.dtos.*
 import org.jetbrains.dokka.base.DokkaBase
+import org.jetbrains.dokka.model.*
 import org.jetbrains.dokka.pages.PageNode
 import org.jetbrains.dokka.pages.RootPageNode
 import org.jetbrains.dokka.pages.WithDocumentables
@@ -16,13 +14,14 @@ import org.jetbrains.dokka.plugability.plugin
 import org.jetbrains.dokka.plugability.querySingle
 import org.jetbrains.dokka.renderers.Renderer
 import java.io.File
+import java.util.concurrent.ConcurrentLinkedQueue
 
 class JsonRenderer(private val context: DokkaContext) : Renderer {
     
     private val json = Json { 
-        prettyPrint = true 
+        prettyPrint = false 
         classDiscriminator = "kind" 
-        encodeDefaults = true
+        encodeDefaults = false
         ignoreUnknownKeys = true 
     }
 
@@ -30,7 +29,6 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         val fqcn = "my.dokka.plugin.JsonOutputPlugin"
         var config = configuration<JsonOutputPlugin, JsonPluginConfig>(context)
 
-        // MANUAL FALLBACK PARSING
         if (config == null) {
             val rawConfig = context.configuration.pluginsConfiguration.find { it.fqPluginName == fqcn }?.values
             if (rawConfig != null) {
@@ -57,7 +55,13 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         val outputDir = context.configuration.outputDir
         logger.debug("Output directory set to: ${outputDir.absolutePath}")
 
-        // --- MULTIMODULE ROOT GENERATION ---
+        val packageListFile = File(outputDir, "package-list")
+        packageListFile.parentFile.mkdirs()
+        if (!packageListFile.exists()) {
+            packageListFile.writeText("${'$'}dokka.location.stream${'$'}\n")
+            logger.debug("Generated dummy package-list to satisfy Gradle copy tasks.")
+        }
+
         if (context.configuration.modules.isNotEmpty()) {
             logger.info("Multimodule project detected. Generating root index.json...")
             
@@ -82,20 +86,46 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
             logger.debug("Wrote Multimodule Root JSON to: ${outputFile.name}")
         }
 
-        // --- STANDARD TRAVERSAL WITH ANCESTRY TRACKING ---
+        // Thread-safe list to aggregate all type documentables during traversal
+        val allTypesList = ConcurrentLinkedQueue<TypeIndexEntryDto>()
+
+        // --- STANDARD SYNCHRONOUS TRAVERSAL ---
         fun traverse(node: PageNode, ancestors: List<PageNode>) {
-            // Push the current page onto the navigation stack
             val currentPath = ancestors + node
             
             if (node is WithDocumentables && node.documentables.isNotEmpty()) {
                 val documentable = node.documentables.first()
                 logger.debug("Processing documentable: ${documentable.name} (${documentable.dri})")
                 
-                // --- NEW: Generate Breadcrumbs ---
-                val breadcrumbs = currentPath.map { ancestor ->
-                    // Resolve the relative URL from the CURRENT node to this ANCESTOR
-                    var url = locationProvider.resolve(ancestor, context = node, skipExtension = false)
+                if (documentable is DClasslike || documentable is DTypeAlias) {
+                    var typeUrl = locationProvider.resolve(node, context = null, skipExtension = false)
+                    if (typeUrl != null && finalConfig.replaceHtmlExtension && !typeUrl.startsWith("http")) {
+                        typeUrl = typeUrl.replace(".html", ".json")
+                    }
                     
+                    val kindStr = when (documentable) {
+                        is DClass -> "class"
+                        is DInterface -> "interface"
+                        is DEnum -> "enum"
+                        is DObject -> "object"
+                        is DAnnotation -> "annotation"
+                        is DTypeAlias -> "typeAlias"
+                        else -> "type"
+                    }
+                    
+                    allTypesList.add(
+                        TypeIndexEntryDto(
+                            name = documentable.name ?: "Unknown",
+                            kind = kindStr,
+                            dri = documentable.dri.toString(),
+                            url = typeUrl,
+                            sourceSets = documentable.sourceSets.map { it.sourceSetID.toString().substringAfterLast("/") }
+                        )
+                    )
+                }
+
+                val breadcrumbs = currentPath.map { ancestor ->
+                    var url = locationProvider.resolve(ancestor, context = node, skipExtension = false)
                     if (url != null && finalConfig.replaceHtmlExtension && !url.startsWith("http")) {
                         url = url.replace(".html", ".json")
                     }
@@ -109,7 +139,6 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
                     replaceHtmlExtension = finalConfig.replaceHtmlExtension
                 )
                 
-                // Pass the breadcrumbs array down into the DTO builder!
                 val dto = mapper.mapToDto(documentable, breadcrumbs)
                 
                 if (dto != null) {
@@ -125,12 +154,25 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
                 }
             }
             
-            // Pass the path down to the children
             node.children.forEach { traverse(it, currentPath) }
         }
 
-        // Kick off the traversal with an empty path history
         traverse(root, emptyList())
+
+        if (allTypesList.isNotEmpty()) {
+            logger.info("Generating all-types.json index...")
+            val allTypesDto = AllTypesDto(
+                types = allTypesList.sortedBy { it.name }
+            )
+            val allTypesFile = File(outputDir, "all-types.json")
+            allTypesFile.parentFile.mkdirs()
+            
+            val rawJsonElement = json.encodeToJsonElement(DocumentableDto.serializer(), allTypesDto)
+            val filteredJsonElement = filterJson(rawJsonElement, finalConfig.omitFields)
+            allTypesFile.writeText(json.encodeToString(JsonElement.serializer(), filteredJsonElement))
+            
+            logger.debug("Wrote All-Types JSON to: ${allTypesFile.name}")
+        }
         
         LinkPostProcessor.postProcess(context)
         logger.info("JSON rendering completed.")

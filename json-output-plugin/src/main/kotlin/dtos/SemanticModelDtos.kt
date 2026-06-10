@@ -14,12 +14,11 @@ data class TagWrapperDto(
 
 // --- Extras & Properties ---
 
-
 @Serializable
 data class AnnotationWrapperDto(
     val dri: String,
     val params: Map<String, String>,
-    val url: String? = null // <--- ADD THIS
+    val url: String? = null
 )
 
 @Serializable
@@ -110,7 +109,7 @@ sealed class DocumentableDto {
     abstract val sourceSets: List<String>
     abstract val expectPresentInSet: String?
     abstract val extras: ExtrasDto
-    abstract val breadcrumbs: List<BreadcrumbNode> // <-- NEW: Added to base class
+    abstract val breadcrumbs: List<BreadcrumbNode>
 }
 
 @Serializable
@@ -391,9 +390,33 @@ data class MultimoduleRootDto(
     val modules: List<ModuleReferenceDto>
 ) : DocumentableDto()
 
-// --- NEW: Breadcrumb Node ---
 @Serializable
 data class BreadcrumbNode(
     val name: String,
     val url: String?
 )
+
+// --- NEW: All Types Index ---
+
+@Serializable
+data class TypeIndexEntryDto(
+    val name: String,
+    val kind: String,
+    val dri: String,
+    val url: String?,
+    val sourceSets: List<String>
+)
+
+@Serializable
+@SerialName("allTypes")
+data class AllTypesDto(
+    override val dri: String = "all-types",
+    override val name: String? = "All Types",
+    override val url: String? = "all-types.json",
+    override val documentation: Map<String, List<TagWrapperDto>> = emptyMap(),
+    override val sourceSets: List<String> = emptyList(),
+    override val expectPresentInSet: String? = null,
+    override val extras: ExtrasDto = ExtrasDto(),
+    override val breadcrumbs: List<BreadcrumbNode> = emptyList(),
+    val types: List<TypeIndexEntryDto>
+) : DocumentableDto()

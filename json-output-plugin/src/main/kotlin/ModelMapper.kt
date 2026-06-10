@@ -419,14 +419,21 @@ private fun mapExtras(extra: PropertyContainer<*>): ExtrasDto {
         }
     }
 
+    // Transforms ":kotlin-stdlib_2.4_latest/common" into just "common"
+    private fun abbreviateSourceSet(id: String): String {
+        return id.substringAfterLast("/")
+    }
+
     private fun <T, R> mapSourceSetDependent(
         dependent: SourceSetDependent<T>, 
         mapper: (org.jetbrains.dokka.DokkaConfiguration.DokkaSourceSet, T) -> R
     ): Map<String, R> {
-        return dependent.entries.associate { it.key.sourceSetID.toString() to mapper(it.key, it.value) }
+        return dependent.entries.associate { 
+            abbreviateSourceSet(it.key.sourceSetID.toString()) to mapper(it.key, it.value) 
+        }
     }
 
     private fun mapSourceSets(sets: Set<org.jetbrains.dokka.DokkaConfiguration.DokkaSourceSet>): List<String> {
-        return sets.map { it.sourceSetID.toString() }
+        return sets.map { abbreviateSourceSet(it.sourceSetID.toString()) }
     }
 }
