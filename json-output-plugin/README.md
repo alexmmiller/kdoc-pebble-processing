@@ -1,8 +1,4 @@
-Here is a comprehensive draft for your `README.md`. It covers all the essential aspects of the plugin's architecture, its configuration, and the specific hurdles we overcame to make it compatible with massive, heavily customized builds like the Kotlin standard library.
-
----
-
-# Dokka JSON Output Plugin
+Here is a comprehensive draft for your `README.md`. It covers all the essential aspects of the plugin's architecture, its # Dokka JSON Output Plugin
 
 A custom Dokka plugin that completely replaces Dokka's default HTML renderer to output a raw, structured JSON representation of your Kotlin documentation.
 
