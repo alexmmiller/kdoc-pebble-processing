@@ -411,7 +411,7 @@ private fun mapExtras(extra: PropertyContainer<*>): ExtrasDto {
             }
             is DocumentationLink -> {
                 val href = resolveUrl(tag.dri, sourceSets)
-                "<a href=\"$href\" data-dri=\"${tag.dri}\">${tag.children.joinToString("") { extractText(it, sourceSets) }}</a>"
+                "<a href=\"$href\">${tag.children.joinToString("") { extractText(it, sourceSets) }}</a>"
             }
             
             is CustomDocTag -> tag.children.joinToString("") { extractText(it, sourceSets) }

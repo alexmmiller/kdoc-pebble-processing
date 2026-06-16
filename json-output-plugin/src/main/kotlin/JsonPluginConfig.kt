@@ -7,6 +7,6 @@ import org.jetbrains.dokka.plugability.ConfigurableBlock
 data class JsonPluginConfig(
     val logLevel: String = "debug", 
     val omitFields: List<String> = emptyList(),
-    val logFile: String? = "/home/alex/dokka_plugin_debug.log",
+    val logFile: String? = "/Users/alex/dokka_plugin_debug.log",
     val replaceHtmlExtension: Boolean = false // <--- ADD THIS (Defaults to true to preserve current behavior)
 ) : ConfigurableBlock
