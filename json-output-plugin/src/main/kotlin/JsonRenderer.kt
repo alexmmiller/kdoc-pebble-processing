@@ -22,6 +22,7 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         prettyPrint = false 
         classDiscriminator = "kind" 
         encodeDefaults = false
+        explicitNulls = false
         ignoreUnknownKeys = true 
     }
 
@@ -55,13 +56,6 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         val outputDir = context.configuration.outputDir
         logger.debug("Output directory set to: ${outputDir.absolutePath}")
 
-        val packageListFile = File(outputDir, "package-list")
-        packageListFile.parentFile.mkdirs()
-        if (!packageListFile.exists()) {
-            packageListFile.writeText("${'$'}dokka.location.stream${'$'}\n")
-            logger.debug("Generated dummy package-list to satisfy Gradle copy tasks.")
-        }
-
         if (context.configuration.modules.isNotEmpty()) {
             logger.info("Multimodule project detected. Generating root index.json...")
             
@@ -86,8 +80,9 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
             logger.debug("Wrote Multimodule Root JSON to: ${outputFile.name}")
         }
 
-        // Thread-safe list to aggregate all type documentables during traversal
+        // Thread-safe lists to aggregate entries during traversal
         val allTypesList = ConcurrentLinkedQueue<TypeIndexEntryDto>()
+        val packageNamesList = ConcurrentLinkedQueue<String>()
 
         // --- STANDARD SYNCHRONOUS TRAVERSAL ---
         fun traverse(node: PageNode, ancestors: List<PageNode>) {
@@ -97,6 +92,12 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
                 val documentable = node.documentables.first()
                 logger.debug("Processing documentable: ${documentable.name} (${documentable.dri})")
                 
+                // Collect Package Names
+                if (documentable is DPackage && !documentable.name.isNullOrBlank()) {
+                    packageNamesList.add(documentable.name)
+                }
+                
+                // Collect Types for All Types Index
                 if (documentable is DClasslike || documentable is DTypeAlias) {
                     var typeUrl = locationProvider.resolve(node, context = null, skipExtension = false)
                     if (typeUrl != null && finalConfig.replaceHtmlExtension && !typeUrl.startsWith("http")) {
@@ -146,10 +147,17 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
                     val outputFile = File(outputDir, "$pagePath.json")
                     outputFile.parentFile.mkdirs()
                     
-                    val rawJsonElement = json.encodeToJsonElement(DocumentableDto.serializer(), dto)
-                    val filteredJsonElement = filterJson(rawJsonElement, finalConfig.omitFields)
-                    outputFile.writeText(json.encodeToString(JsonElement.serializer(), filteredJsonElement))
+                    // 1. Encode your DTO to a JsonElement
+                    val rawElement = json.encodeToJsonElement(DocumentableDto.serializer(), dto)
+
+                    // 2. Apply your existing omitFields filter, then strip all empty arrays/strings/objects
+                    val filteredElement = filterJson(rawElement, finalConfig.omitFields)
+                    val cleanedElement = filteredElement.removeEmptyAndNulls()
+
+                    // 3. Convert the cleaned AST to a string using the explicit JsonElement serializer
+                    val finalJsonString = json.encodeToString(JsonElement.serializer(), cleanedElement)
                     
+                    outputFile.writeText(finalJsonString)
                     logger.debug("Wrote JSON to: ${outputFile.name}")
                 }
             }
@@ -174,8 +182,35 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
             logger.debug("Wrote All-Types JSON to: ${allTypesFile.name}")
         }
         
+        // --- Write Package List ---
+        logger.info("Generating package-list...")
+        val packageListContent = generatePackageListContent(packageNamesList.toList())
+        val packageListFile = File(outputDir, "package-list")
+        packageListFile.parentFile.mkdirs()
+        packageListFile.writeText(packageListContent)
+        logger.debug("Wrote package-list to: ${packageListFile.name}")
+        
         LinkPostProcessor.postProcess(context)
         logger.info("JSON rendering completed.")
+    }
+    
+    /**
+     * Generates the content for a Dokka-compatible package-list file.
+     */
+    private fun generatePackageListContent(packageNames: List<String>): String {
+        return buildString {
+            appendLine("\$dokka.format:html-v1")
+            appendLine("\$dokka.linkExtension:html")
+            // Note: \u001F is the required invisible Unit Separator character
+            appendLine("\$dokka.location:.alltypes////PointingToDeclaration/\u001Fall-types.html")
+            
+            packageNames.sorted().forEach { packageName ->
+                // Skip the root/empty package if it exists
+                if (packageName.isNotBlank() && packageName != "[root]") {
+                    appendLine(packageName)
+                }
+            }
+        }
     }
 
     private fun filterJson(element: JsonElement, omitFields: List<String>): JsonElement {
@@ -193,5 +228,32 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
             }
             else -> element
         }
+    }
+
+    /**
+    * Recursively removes nulls, empty strings, empty arrays, and empty objects from a JsonElement.
+    */
+    fun JsonElement.removeEmptyAndNulls(): JsonElement = when (this) {
+        is JsonObject -> {
+            val filtered = this.mapValues { it.value.removeEmptyAndNulls() }
+                .filter { (_, value) ->
+                    value !is JsonNull &&
+                    !(value is JsonArray && value.isEmpty()) &&
+                    !(value is JsonObject && value.isEmpty()) &&
+                    !(value is JsonPrimitive && value.isString && value.content.isEmpty())
+                }
+            JsonObject(filtered)
+        }
+        is JsonArray -> {
+            val filtered = this.map { it.removeEmptyAndNulls() }
+                .filter {
+                    it !is JsonNull &&
+                    !(it is JsonArray && it.isEmpty()) &&
+                    !(it is JsonObject && it.isEmpty()) &&
+                    !(it is JsonPrimitive && it.isString && it.content.isEmpty())
+                }
+            JsonArray(filtered)
+        }
+        else -> this
     }
 }
