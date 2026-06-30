@@ -56,6 +56,34 @@ class JsonRenderer(private val context: DokkaContext) : Renderer {
         val outputDir = context.configuration.outputDir
         logger.debug("Output directory set to: ${outputDir.absolutePath}")
 
+        // --- NEW: Collect and write actual packages to package-list ---
+        val packages = mutableSetOf<String>()
+        fun collectPackages(node: PageNode) {
+            if (node is WithDocumentables) {
+                node.documentables.forEach { doc ->
+                    if (doc is org.jetbrains.dokka.model.DPackage) {
+                        doc.dri.packageName?.takeIf { it.isNotBlank() }?.let { packages.add(it) }
+                    }
+                }
+            }
+            node.children.forEach { collectPackages(it) }
+        }
+        collectPackages(root)
+
+        val packageListFile = File(outputDir, "package-list")
+        packageListFile.parentFile.mkdirs()
+        
+        val packageListContent = buildString {
+            appendLine("\$dokka.format:json-v1\$")
+            appendLine("\$dokka.linkExtension:json\$")
+            packages.sorted().forEach {
+                appendLine(it)
+            }
+        }
+        
+        packageListFile.writeText(packageListContent)
+        logger.debug("Generated package-list with ${packages.size} packages.")
+
         if (context.configuration.modules.isNotEmpty()) {
             logger.info("Multimodule project detected. Generating root index.json...")
             
